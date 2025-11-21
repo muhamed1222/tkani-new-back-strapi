@@ -1,0 +1,97 @@
+{
+  "kind": "collectionType",
+  "collectionName": "products",
+  "info": {
+    "singularName": "product",
+    "pluralName": "products",
+    "displayName": "Product",
+    "description": "Товары магазина"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "text"
+    },
+    "price": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "stock": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "images": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "specifications": {
+      "type": "json"
+    },
+    "rating": {
+      "type": "decimal",
+      "default": 0,
+      "min": 0,
+      "max": 5
+    },
+    "reviews_count": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "category": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::category.category",
+      "inversedBy": "products"
+    },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand",
+      "inversedBy": "products"
+    },
+    "article": {
+      "type": "string"
+    },
+    "discount_price": {
+      "type": "decimal"
+    },
+    "discount": {
+      "type": "integer"
+    },
+    "composition": {
+      "type": "string"
+    },
+    "width": {
+      "type": "string"
+    },
+    "density": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    }
+  }
+}
