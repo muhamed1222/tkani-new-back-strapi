@@ -11,7 +11,7 @@ module.exports = {
 
       console.log('🛒 ПОЛУЧЕНИЕ КОРЗИНЫ для пользователя:', user.id);
 
-      // Ищем корзину пользователя с полным populate
+      // Ищем корзину пользователя с правильным populate для Strapi v4
       const carts = await strapi.entityService.findMany('api::cart.cart', {
         filters: {
           user: user.id
@@ -20,15 +20,7 @@ module.exports = {
           items: {
             populate: {
               product: {
-                populate: {
-                  images: true,
-                  category: true,
-                  brand: true,
-                  name: true,
-                  price: true,
-                  discount: true,
-                  discount_price: true
-                }
+                populate: ['images', 'category', 'brand']
               }
             }
           }
@@ -51,35 +43,13 @@ module.exports = {
             items: {
               populate: {
                 product: {
-                  populate: {
-                    images: true,
-                    category: true,
-                    brand: true,
-                    name: true,
-                    price: true
-                  }
+                  populate: ['images', 'category', 'brand']
                 }
               }
             }
           }
         });
         console.log('🛒 Новая корзина создана с ID:', cart.id);
-      }
-
-      // Логируем структуру данных для отладки
-      if (cart && cart.items && cart.items.length > 0) {
-        console.log('📦 Структура товаров в корзине:');
-        cart.items.forEach((item, index) => {
-          console.log(`Товар ${index + 1}:`, {
-            id: item.id,
-            product_id: item.product?.id,
-            product_name: item.product?.name,
-            product_price: item.product?.price,
-            has_images: !!item.product?.images,
-            images_count: item.product?.images?.length,
-            images_structure: item.product?.images?.[0]
-          });
-        });
       }
 
       return {
@@ -91,7 +61,6 @@ module.exports = {
       return ctx.badRequest('Ошибка получения корзины: ' + error.message);
     }
   },
-
   async addToCart(ctx) {
     try {
       const user = ctx.state.user;
@@ -113,30 +82,14 @@ module.exports = {
         return ctx.badRequest('Product ID is required');
       }
 
-      // Проверяем существование товара с полным populate
+      // Проверяем существование товара
       const product = await strapi.entityService.findOne('api::product.product', product_id, {
-        populate: {
-          images: true,
-          category: true,
-          brand: true,
-          name: true,
-          price: true,
-          discount: true,
-          discount_price: true
-        }
+        populate: ['images', 'category', 'brand']
       });
 
       if (!product) {
         return ctx.badRequest('Product not found');
       }
-
-      console.log('📦 Найден товар:', {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        has_images: !!product.images,
-        images_count: product.images?.length
-      });
 
       // Находим корзину пользователя
       const carts = await strapi.entityService.findMany('api::cart.cart', {
@@ -145,9 +98,7 @@ module.exports = {
         },
         populate: {
           items: {
-            populate: {
-              product: true
-            }
+            populate: ['product']
           }
         }
       });
@@ -168,6 +119,7 @@ module.exports = {
       }
 
       console.log('🛒 Работаем с корзиной ID:', cart.id);
+      console.log('📦 Текущие товары в корзине:', cart.items?.length);
 
       // Инициализируем items
       const currentItems = cart.items || [];
@@ -181,8 +133,25 @@ module.exports = {
 
       if (existingItemIndex >= 0) {
         // Обновляем количество существующего товара
-        const updatedItems = [...currentItems];
-        updatedItems[existingItemIndex].quantity = parseFloat(quantity);
+        // В Strapi v4 для обновления компонентов нужно использовать правильный формат
+        const updatedItems = currentItems.map((item, index) => {
+          if (index === existingItemIndex) {
+            return {
+              id: item.id, // Сохраняем ID компонента
+              product: item.product.id, // Сохраняем связь с продуктом
+              quantity: parseFloat(quantity),
+              price: item.price || product.price
+            };
+          }
+          return item;
+        });
+
+        console.log('🔄 Обновляем существующий товар:', {
+          existingItemIndex,
+          currentQuantity: currentItems[existingItemIndex].quantity,
+          newQuantity: quantity,
+          updatedItemsCount: updatedItems.length
+        });
 
         updatedCart = await strapi.entityService.update('api::cart.cart', cart.id, {
           data: {
@@ -192,20 +161,16 @@ module.exports = {
             items: {
               populate: {
                 product: {
-                  populate: {
-                    images: true,
-                    category: true,
-                    brand: true,
-                    name: true,
-                    price: true
-                  }
+                  populate: ['images', 'category', 'brand']
                 }
               }
             }
           }
         });
+
+        console.log('✅ Количество товара обновлено');
       } else {
-        // Добавляем новый товар
+        // Добавляем новый товар - ПРАВИЛЬНАЯ СТРУКТУРА ДЛЯ КОМПОНЕНТА
         const newItem = {
           product: product_id,
           quantity: parseFloat(quantity),
@@ -214,6 +179,12 @@ module.exports = {
 
         const updatedItems = [...currentItems, newItem];
 
+        console.log('🆕 Добавляем новый товар в корзину:', {
+          currentItemsCount: currentItems.length,
+          newItem,
+          updatedItemsCount: updatedItems.length
+        });
+
         updatedCart = await strapi.entityService.update('api::cart.cart', cart.id, {
           data: {
             items: updatedItems
@@ -222,21 +193,32 @@ module.exports = {
             items: {
               populate: {
                 product: {
-                  populate: {
-                    images: true,
-                    category: true,
-                    brand: true,
-                    name: true,
-                    price: true
-                  }
+                  populate: ['images', 'category', 'brand']
                 }
               }
             }
           }
         });
+
+        console.log('✅ Новый товар добавлен в корзину');
       }
 
-      console.log('✅ Товар добавлен в корзину ID:', updatedCart.id);
+      console.log('🛒 Корзина обновлена, ID:', updatedCart.id);
+      console.log('📦 Товаров в корзине после обновления:', updatedCart.items?.length);
+
+      if (updatedCart.items && updatedCart.items.length > 0) {
+        updatedCart.items.forEach((item, index) => {
+          console.log(`   Товар ${index + 1}:`, {
+            id: item.id,
+            product_id: item.product?.id,
+            product_name: item.product?.name,
+            quantity: item.quantity
+          });
+        });
+      } else {
+        console.log('❌ В корзине нет товаров после обновления!');
+      }
+
       return {
         data: updatedCart
       };
@@ -245,96 +227,6 @@ module.exports = {
       console.error('❌ Ошибка добавления в корзину:', error);
       console.error('Stack:', error.stack);
       return ctx.badRequest('Ошибка добавления в корзину: ' + error.message);
-    }
-  },
-
-  async updateCart(ctx) {
-    try {
-      const user = ctx.state.user;
-
-      if (!user) {
-        return ctx.unauthorized('Not authenticated');
-      }
-
-      const { product_id, quantity } = ctx.request.body;
-
-      console.log('🛒 ОБНОВЛЕНИЕ КОРЗИНЫ:', {
-        user: user.id,
-        product_id,
-        quantity
-      });
-
-      if (!product_id || quantity === undefined) {
-        return ctx.badRequest('Product ID and quantity are required');
-      }
-
-      if (quantity < 0.1) {
-        return ctx.badRequest('Quantity must be at least 0.1');
-      }
-
-      // Находим корзину пользователя
-      const carts = await strapi.entityService.findMany('api::cart.cart', {
-        filters: {
-          user: user.id
-        },
-        populate: {
-          items: {
-            populate: {
-              product: true
-            }
-          }
-        }
-      });
-
-      if (!carts || carts.length === 0) {
-        return ctx.badRequest('Cart not found');
-      }
-
-      const userCart = carts[0];
-      const currentItems = userCart.items || [];
-
-      // Находим товар в корзине
-      const itemIndex = currentItems.findIndex(item =>
-        item.product && item.product.id == product_id
-      );
-
-      if (itemIndex === -1) {
-        return ctx.badRequest('Product not found in cart');
-      }
-
-      // Обновляем количество
-      const updatedItems = [...currentItems];
-      updatedItems[itemIndex].quantity = parseFloat(quantity);
-
-      const updatedCart = await strapi.entityService.update('api::cart.cart', userCart.id, {
-        data: {
-          items: updatedItems
-        },
-        populate: {
-          items: {
-            populate: {
-              product: {
-                populate: {
-                  images: true,
-                  category: true,
-                  brand: true,
-                  name: true,
-                  price: true
-                }
-              }
-            }
-          }
-        }
-      });
-
-      console.log('✅ Корзина обновлена ID:', updatedCart.id);
-      return {
-        data: updatedCart
-      };
-
-    } catch (error) {
-      console.error('❌ Ошибка обновления корзины:', error);
-      return ctx.badRequest('Ошибка обновления корзины: ' + error.message);
     }
   },
 
@@ -361,9 +253,7 @@ module.exports = {
         },
         populate: {
           items: {
-            populate: {
-              product: true
-            }
+            populate: ['product']
           }
         }
       });
@@ -388,20 +278,13 @@ module.exports = {
           items: {
             populate: {
               product: {
-                populate: {
-                  images: true,
-                  category: true,
-                  brand: true,
-                  name: true,
-                  price: true
-                }
+                populate: ['images']
               }
             }
           }
         }
       });
 
-      console.log('✅ Товар удален из корзины ID:', updatedCart.id);
       return {
         data: updatedCart
       };
@@ -446,20 +329,13 @@ module.exports = {
           items: {
             populate: {
               product: {
-                populate: {
-                  images: true,
-                  category: true,
-                  brand: true,
-                  name: true,
-                  price: true
-                }
+                populate: ['images']
               }
             }
           }
         }
       });
 
-      console.log('✅ Корзина очищена ID:', updatedCart.id);
       return {
         data: updatedCart
       };
@@ -467,6 +343,124 @@ module.exports = {
     } catch (error) {
       console.error('❌ Ошибка очистки корзины:', error);
       return ctx.badRequest('Ошибка очистки корзины: ' + error.message);
+    }
+  },
+  async updateCart(ctx) {
+    try {
+      const user = ctx.state.user;
+
+      if (!user) {
+        return ctx.unauthorized('Not authenticated');
+      }
+
+      const { product_id, quantity } = ctx.request.body;
+
+      console.log('🛒 ОБНОВЛЕНИЕ КОРЗИНЫ:', {
+        user: user.id,
+        product_id,
+        quantity
+      });
+
+      // Валидация
+      if (!product_id) {
+        return ctx.badRequest('Product ID is required');
+      }
+
+      if (!quantity || quantity < 0.1) {
+        return ctx.badRequest('Quantity must be at least 0.1');
+      }
+
+      // Находим корзину пользователя с полным populate
+      const carts = await strapi.entityService.findMany('api::cart.cart', {
+        filters: {
+          user: user.id
+        },
+        populate: {
+          items: {
+            populate: {
+              product: {
+                populate: ['images', 'category', 'brand']
+              }
+            }
+          }
+        }
+      });
+
+      if (!carts || carts.length === 0) {
+        return ctx.badRequest('Cart not found');
+      }
+
+      const userCart = carts[0];
+      const currentItems = userCart.items || [];
+
+      console.log('🔍 Текущие товары в корзине:', currentItems.map(item => ({
+        id: item.id,
+        product_id: item.product?.id,
+        product_name: item.product?.name,
+        quantity: item.quantity
+      })));
+
+      // Ищем товар для обновления
+      const itemIndex = currentItems.findIndex(item =>
+        item.product && item.product.id == product_id
+      );
+
+      if (itemIndex === -1) {
+        return ctx.badRequest('Product not found in cart');
+      }
+
+      // Создаем обновленный элемент с сохранением ВСЕХ данных
+      const updatedItems = currentItems.map((item, index) => {
+        if (index === itemIndex) {
+          return {
+            id: item.id, // Сохраняем ID компонента
+            product: item.product.id, // Сохраняем связь с продуктом
+            quantity: parseFloat(quantity),
+            price: item.price || item.product?.price
+          };
+        }
+        return item;
+      });
+
+      console.log('🔄 Обновляемые данные:', {
+        itemIndex,
+        oldQuantity: currentItems[itemIndex].quantity,
+        newQuantity: quantity,
+        product_id: product_id
+      });
+
+      // Обновляем корзину
+      const updatedCart = await strapi.entityService.update('api::cart.cart', userCart.id, {
+        data: {
+          items: updatedItems
+        },
+        populate: {
+          items: {
+            populate: {
+              product: {
+                populate: ['images', 'category', 'brand']
+              }
+            }
+          }
+        }
+      });
+
+      console.log('✅ Количество товара обновлено');
+      console.log('📦 Корзина после обновления:', updatedCart.items?.map(item => ({
+        id: item.id,
+        product_id: item.product?.id,
+        product_name: item.product?.name,
+        quantity: item.quantity
+      })));
+
+      return {
+        data: updatedCart
+      };
+
+    } catch (error) {
+      console.error('❌ Ошибка обновления корзины:', error);
+      console.error('Stack:', error.stack);
+      return ctx.badRequest('Ошибка обновления корзины: ' + error.message);
     }
   }
 };
