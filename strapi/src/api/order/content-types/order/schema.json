@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Order",
+    "description": "Заказы пользователей"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "order_number": {
+      "type": "string",
+      "unique": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "placed",
+        "confirmed",
+        "processing",
+        "ready",
+        "completed",
+        "cancelled"
+      ],
+      "default": "placed"
+    },
+    "total_price": {
+      "type": "decimal"
+    },
+    "items_count": {
+      "type": "integer"
+    },
+    "delivery_method": {
+      "type": "string"
+    },
+    "payment_method": {
+      "type": "string"
+    },
+    "delivery_date": {
+      "type": "string"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "items": {
+      "type": "component",
+      "repeatable": true,
+      "component": "order.order-item"
+    }
+  }
+}
