@@ -1,3 +1,4 @@
+// strapi/src/api/profile/controllers/profile.js
 'use strict';
 
 module.exports = {
@@ -13,12 +14,12 @@ module.exports = {
         return ctx.unauthorized('Not authenticated');
       }
 
-      const { firstName, lastName, email } = ctx.request.body;
+      const { firstName, lastName, email, phone } = ctx.request.body;
 
       console.log('🔄 Обновление профиля для пользователя:', user.id);
-      console.log('📝 Новые данные:', { firstName, lastName, email });
+      console.log('📝 Новые данные:', { firstName, lastName, email, phone });
 
-      // Валидация
+      // Валидация email
       if (email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
@@ -40,11 +41,21 @@ module.exports = {
         }
       }
 
+      // Валидация телефона (если передан)
+      if (phone && phone.trim() !== '') {
+        const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/;
+        const cleanPhone = phone.replace(/\s/g, '');
+        if (!phoneRegex.test(cleanPhone)) {
+          return ctx.badRequest('Неверный формат телефона');
+        }
+      }
+
       // Обновляем данные - используем правильные имена полей для Strapi
       const updateData = {};
       if (firstName !== undefined) updateData.firstname = firstName;
       if (lastName !== undefined) updateData.lastname = lastName;
       if (email !== undefined) updateData.email = email.toLowerCase();
+      if (phone !== undefined) updateData.phone = phone.trim(); // Добавляем поле phone
 
       console.log('🔄 Данные для обновления:', updateData);
 
@@ -61,7 +72,8 @@ module.exports = {
         id: updatedUser.id,
         firstname: updatedUser.firstname,
         lastname: updatedUser.lastname,
-        email: updatedUser.email
+        email: updatedUser.email,
+        phone: updatedUser.phone // Добавляем телефон в логи
       });
 
       // Убираем чувствительные данные
@@ -106,6 +118,7 @@ module.exports = {
         email: fullUser.email,
         firstname: fullUser.firstname,
         lastname: fullUser.lastname,
+        phone: fullUser.phone, // Добавляем телефон в логи
         role: fullUser.role
       });
 
@@ -121,6 +134,84 @@ module.exports = {
     } catch (error) {
       console.error('❌ Ошибка проверки авторизации:', error);
       ctx.unauthorized('Ошибка авторизации');
+    }
+  },
+
+  async deleteAccount(ctx) {
+    try {
+      console.log('🗑️ Удаление аккаунта - начало');
+      console.log('🔐 User state:', ctx.state.user);
+
+      const user = ctx.state.user;
+
+      if (!user) {
+        console.log('❌ Пользователь не авторизован');
+        return ctx.unauthorized('Not authenticated');
+      }
+
+      console.log('🗑️ Удаление пользователя с ID:', user.id);
+
+      // Получаем полные данные пользователя
+      const userToDelete = await strapi.entityService.findOne(
+        'plugin::users-permissions.user',
+        user.id,
+        {
+          populate: ['role', 'cart', 'orders', 'avatar']
+        }
+      );
+
+      if (!userToDelete) {
+        return ctx.notFound('Пользователь не найден');
+      }
+
+      console.log('👤 Данные пользователя для удаления:', {
+        id: userToDelete.id,
+        email: userToDelete.email,
+        username: userToDelete.username
+      });
+
+      // Удаляем связанные данные (корзина, заказы и т.д.)
+      try {
+        // Удаляем корзину пользователя если существует
+        if (userToDelete.cart) {
+          await strapi.entityService.delete('api::cart.cart', userToDelete.cart.id);
+          console.log('✅ Корзина пользователя удалена');
+        }
+
+        // Удаляем аватар если существует
+        if (userToDelete.avatar) {
+          await strapi.plugins['upload'].services.upload.remove(userToDelete.avatar);
+          console.log('✅ Аватар пользователя удален');
+        }
+
+        // Помечаем заказы как анонимные или удаляем (в зависимости от бизнес-логики)
+        // await strapi.entityService.updateMany('api::order.order', {
+        //   filters: { user: user.id },
+        //   data: { user: null }
+        // });
+        // console.log('✅ Заказы пользователя обновлены');
+
+      } catch (cleanupError) {
+        console.warn('⚠️ Ошибка при очистке связанных данных:', cleanupError);
+        // Продолжаем удаление пользователя даже если очистка не удалась
+      }
+
+      // Удаляем пользователя
+      const deletedUser = await strapi.entityService.delete(
+        'plugin::users-permissions.user',
+        user.id
+      );
+
+      console.log('✅ Аккаунт успешно удален:', deletedUser.id);
+
+      ctx.send({
+        success: true,
+        message: 'Аккаунт успешно удален'
+      });
+
+    } catch (error) {
+      console.error('❌ Ошибка удаления аккаунта:', error);
+      ctx.badRequest('Ошибка удаления аккаунта: ' + error.message);
     }
   }
 };

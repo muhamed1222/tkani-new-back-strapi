@@ -1,3 +1,4 @@
+// strapi/src/api/profile/routes/profile.js
 'use strict';
 
 module.exports = {
@@ -19,6 +20,19 @@ module.exports = {
       method: 'GET',
       path: '/profile/check',
       handler: 'profile.checkAuth',
+      config: {
+        policies: [],
+        middlewares: [],
+        auth: {
+          strategies: ['jwt'],
+          scope: ['authenticated']
+        }
+      }
+    },
+    {
+      method: 'DELETE',
+      path: '/profile',
+      handler: 'profile.deleteAccount',
       config: {
         policies: [],
         middlewares: [],
