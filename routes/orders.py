@@ -5,6 +5,9 @@ from routes.cart import read_cart_from_cookie
 from errors import NotFoundError, ValidationError
 from schemas import OrderSchema
 from sqlalchemy.orm import joinedload
+import json
+from services.delivery_service import calculate_delivery_cost
+from services.payment_service import get_payment_service
 
 orders_bp = Blueprint("orders", __name__)
 
@@ -46,29 +49,114 @@ def create_order():
 
         # Получаем дополнительные данные из запроса
         data = request.get_json() or {}
-        delivery_address = data.get("delivery_address")
-        phone = data.get("phone")
-        comment = data.get("comment")
+        
+        # Данные доставки
+        delivery_data = data.get("delivery", {})
+        delivery_method = delivery_data.get("method", "pickup")
+        delivery_address = delivery_data.get("address", "")
+        
+        # Данные оплаты
+        payment_data = data.get("payment", {})
+        payment_method = payment_data.get("method", "cash")
+        
+        # Данные клиента
+        customer_data = data.get("customer", {})
+        phone = customer_data.get("phone", "")
+        comment = data.get("comment", "")
 
+        # Получаем товары из корзины
+        # Поддерживаем оба формата: из cookie и из Strapi (через items в data)
+        items_data = data.get("items", [])
+        
         total = 0.0
         items = []
-        for pid, qty in cart.items():
-            product = Product.query.get(pid)
-            if not product:
-                continue
-            if product.stock is not None and qty > product.stock:
-                qty = product.stock
-            if qty <= 0:
-                continue
-            line_total = product.price * qty
-            total += line_total
-            items.append((product, qty, product.price))
-
+        subtotal = data.get("subtotal", 0)
+        discount = data.get("discount", 0)
+        
+        # Если товары переданы в запросе (из Strapi корзины)
+        if items_data:
+            for item_data in items_data:
+                product_id = item_data.get("product") or item_data.get("product_id")
+                quantity = item_data.get("quantity", 1)
+                price = item_data.get("price", 0)
+                
+                if not product_id:
+                    continue
+                
+                product = Product.query.get(product_id)
+                if not product:
+                    continue
+                
+                if product.stock is not None and quantity > product.stock:
+                    quantity = product.stock
+                if quantity <= 0:
+                    continue
+                
+                line_total = price * quantity
+                total += line_total
+                items.append((product, quantity, price))
+        else:
+            # Используем корзину из cookie (старый способ)
+            for pid, qty in cart.items():
+                product = Product.query.get(pid)
+                if not product:
+                    continue
+                if product.stock is not None and qty > product.stock:
+                    qty = product.stock
+                if qty <= 0:
+                    continue
+                line_total = product.price * qty
+                total += line_total
+                items.append((product, qty, product.price))
+        
         if not items:
             raise ValidationError("Нет валидных товаров для заказа")
 
-        # Создаем заказ (пока без delivery_address и phone в модели, можно добавить позже)
-        order = Order(user_id=user_id, total=round(total, 2), status="pending")
+        # Рассчитываем стоимость доставки
+        delivery_cost = 0.0
+        delivery_provider_data = None
+        
+        if delivery_method != "pickup":
+            # Примерные параметры для расчета (можно улучшить)
+            weight = sum(qty * 0.5 for _, qty, _ in items)  # Примерно 0.5 кг на товар
+            dimensions = {
+                'length': 30,
+                'width': 20,
+                'height': 10
+            }
+            from_city = "Нальчик"  # Можно вынести в конфиг
+            to_city = delivery_address.split(',')[0] if delivery_address else "Нальчик"
+            
+            delivery_cost = calculate_delivery_cost(
+                delivery_method,
+                weight,
+                dimensions,
+                from_city,
+                to_city,
+                delivery_address
+            )
+            
+            delivery_provider_data = json.dumps({
+                'calculated_cost': delivery_cost,
+                'from_city': from_city,
+                'to_city': to_city
+            })
+
+        # Итоговая сумма с учетом доставки
+        final_total = (subtotal - discount) + delivery_cost if subtotal else total + delivery_cost
+
+        # Создаем заказ с данными доставки и оплаты
+        order = Order(
+            user_id=user_id,
+            total=round(final_total, 2),
+            status="created",
+            delivery_method=delivery_method,
+            delivery_address=delivery_address,
+            delivery_cost=round(delivery_cost, 2),
+            delivery_provider_data=delivery_provider_data,
+            payment_method=payment_method,
+            payment_status="pending"
+        )
         db.session.add(order)
         db.session.flush()  # получить id
 
@@ -79,16 +167,34 @@ def create_order():
             if product.stock is not None:
                 product.stock = max(0, product.stock - qty)
         
+        # Если оплата через ЮMoney, создаем платеж
+        payment_url = None
+        if payment_method == "yoomoney":
+            payment_service = get_payment_service("yoomoney")
+            if payment_service:
+                payment_result = payment_service.create_payment(
+                    order_id=order.id,
+                    amount=final_total,
+                    description=f"Заказ №{order.id}",
+                    return_url=None  # Будет использован FRONTEND_URL из переменных окружения
+                )
+                if payment_result:
+                    order.payment_id = payment_result.get('payment_id')
+                    order.payment_data = json.dumps(payment_result)
+                    payment_url = payment_result.get('payment_url')
+        
         # Добавляем запись в историю с комментарием
-        history_comment = "Заказ создан"
+        history_comment = f"Заказ создан. Доставка: {delivery_method}"
         if delivery_address:
-            history_comment += f". Адрес доставки: {delivery_address}"
+            history_comment += f". Адрес: {delivery_address}"
         if phone:
             history_comment += f". Телефон: {phone}"
         if comment:
             history_comment += f". Комментарий: {comment}"
+        if payment_method:
+            history_comment += f". Оплата: {payment_method}"
         
-        add_order_history(order.id, "pending", changed_by=user_id, comment=history_comment)
+        add_order_history(order.id, "created", changed_by=user_id, comment=history_comment)
         
         db.session.commit()
 
@@ -100,10 +206,16 @@ def create_order():
         order_schema = OrderSchema()
         
         # Очистить cookie корзины
-        resp = jsonify({
+        response_data = {
             "success": True,
             "order": order_schema.dump(order)
-        })
+        }
+        
+        # Если есть URL для оплаты, добавляем его
+        if payment_url:
+            response_data["payment_url"] = payment_url
+        
+        resp = jsonify(response_data)
         resp.set_cookie("cart", "", expires=0)
         return resp, 201
     except (ValidationError, NotFoundError) as e:
@@ -148,8 +260,11 @@ def my_orders():
         page = int(request.args.get("page", 1))
         limit = int(request.args.get("limit", 10))
         
-        # Формируем запрос
-        query = Order.query.filter_by(user_id=user_id)
+        # Формируем запрос с оптимизацией (eager loading)
+        from sqlalchemy.orm import joinedload
+        query = Order.query.options(
+            joinedload(Order.items).joinedload(OrderItem.product)
+        ).filter_by(user_id=user_id)
         
         # Фильтр по статусу
         if status:

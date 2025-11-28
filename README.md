@@ -108,9 +108,8 @@ tkani-new-back/
 │
 └── Скрипты:
     ├── create_admin.py        # Создание администратора
-    ├── data_seed.py           # Заполнение тестовыми данными
-    ├── seed_works.py          # Добавление работ
-    └── seed_brands.py         # Добавление брендов
+    ├── backup_db.py           # Резервное копирование БД
+    └── migrate_to_strapi.py   # Миграция данных в Strapi
 ```
 
 ## 🚀 Запуск проекта
@@ -132,10 +131,8 @@ flask db init
 # Применить миграции
 flask db upgrade
 
-# Добавить тестовые данные
-python3 data_seed.py      # Товары и категории
-python3 seed_works.py     # Работы
-python3 seed_brands.py    # Бренды
+# Для добавления тестовых данных используйте Strapi админ-панель
+# или скрипт миграции: python3 migrate_to_strapi.py
 ```
 
 ### Создание администратора

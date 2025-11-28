@@ -11,6 +11,18 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = os.environ.get("SQLALCHEMY_ECHO", "False").lower() == "true"
     
+    # PostgreSQL connection pooling (для production)
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': int(os.environ.get("DB_POOL_SIZE", 10)),
+        'pool_recycle': int(os.environ.get("DB_POOL_RECYCLE", 3600)),
+        'pool_pre_ping': True,  # Проверка соединения перед использованием
+        'max_overflow': int(os.environ.get("DB_MAX_OVERFLOW", 20)),
+        'connect_args': {
+            'connect_timeout': 10,
+            'application_name': 'tkani_backend'
+        } if 'postgresql' in (os.environ.get("DATABASE_URL", "") or "") else {}
+    }
+    
     # JWT
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "jwt-secret-string-change-in-production")
     JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRES", 3600))  # 1 час по умолчанию
@@ -50,6 +62,12 @@ class Config:
     API_VERSION = "v1"
     API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:5001")
     
+    # Frontend URL (для CORS и redirects)
+    FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+    
+    # CORS
+    ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+    
     # Swagger/OpenAPI
     SWAGGER = {
         "headers": [],
@@ -88,6 +106,26 @@ class ProductionConfig(Config):
     """Конфигурация для production"""
     DEBUG = False
     FLASK_ENV = "production"
+    
+    # Production настройки БД
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 20,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+        'max_overflow': 40,
+        'connect_args': {
+            'connect_timeout': 10,
+            'application_name': 'tkani_backend_prod'
+        } if 'postgresql' in (os.environ.get("DATABASE_URL", "") or "") else {}
+    }
+    
+    # Логирование
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "WARNING")
+    LOG_FILE = os.environ.get("LOG_FILE", None)  # Путь к файлу логов
+    
+    # Мониторинг (Sentry)
+    SENTRY_DSN = os.environ.get("SENTRY_DSN", None)
+    SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT", "production")
 
 # Выбор конфигурации на основе переменной окружения
 config = {

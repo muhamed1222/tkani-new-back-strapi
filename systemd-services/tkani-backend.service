@@ -1,0 +1,28 @@
+[Unit]
+Description=Tkani Backend API
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/tkani-backend
+Environment="PATH=/var/www/tkani-backend/venv/bin"
+Environment="FLASK_ENV=production"
+ExecStart=/var/www/tkani-backend/venv/bin/gunicorn -w 4 -b 0.0.0.0:5001 --timeout 120 app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=10
+
+# Логирование
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tkani-backend
+
+# Безопасность
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

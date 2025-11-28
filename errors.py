@@ -85,6 +85,26 @@ def register_error_handlers(app):
 
     @app.errorhandler(Exception)
     def handle_generic_exception(error):
+        # Логирование ошибки
+        import logging
+        import traceback
+        from flask import current_app
+        
+        logger = logging.getLogger(__name__)
+        
+        # Логируем полную информацию об ошибке
+        error_traceback = traceback.format_exc()
+        logger.error(f"Unhandled exception: {str(error)}\n{error_traceback}")
+        
+        # Отправляем в Sentry, если настроен
+        try:
+            sentry_dsn = current_app.config.get('SENTRY_DSN')
+            if sentry_dsn:
+                import sentry_sdk
+                sentry_sdk.capture_exception(error)
+        except:
+            pass  # Sentry не настроен или не установлен
+        
         # В production режиме не показываем детали ошибки
         import os
         if os.environ.get('FLASK_ENV') == 'development':

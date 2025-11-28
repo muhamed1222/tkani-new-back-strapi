@@ -16,6 +16,13 @@ class User(db.Model):
     orders = db.relationship("Order", backref="user", lazy=True)
     
     __table_args__ = (
+        db.CheckConstraint("length(email) >= 5", name="check_email_length"),
+        db.CheckConstraint("length(first_name) >= 1", name="check_first_name_length"),
+        db.CheckConstraint("length(last_name) >= 1", name="check_last_name_length"),
+        db.CheckConstraint("role IN ('user', 'admin')", name="check_role"),
+    )
+    
+    __table_args__ = (
         db.Index('idx_user_email', 'email'),
         db.Index('idx_user_role', 'role'),
     )
@@ -80,10 +87,32 @@ class Order(db.Model):
     status = db.Column(db.String(50), default="created", index=True)  # created, paid, shipped, cancelled
     history = db.relationship("OrderHistory", backref="order", lazy=True, cascade="all, delete-orphan")
     
+    # Доставка
+    delivery_method = db.Column(db.String(50), nullable=True, index=True)  # pickup, cdek, ozon, russian_post
+    delivery_address = db.Column(db.Text, nullable=True)  # Адрес доставки
+    delivery_cost = db.Column(db.Float, default=0.0)  # Стоимость доставки
+    delivery_provider_data = db.Column(db.Text)  # JSON с данными от провайдера доставки (трек-номер, пункт выдачи и т.д.)
+    
+    # Оплата
+    payment_method = db.Column(db.String(50), nullable=True, index=True)  # card, cash, invoice, yoomoney
+    payment_id = db.Column(db.String(200), nullable=True, index=True)  # ID платежа в системе оплаты
+    payment_status = db.Column(db.String(50), default="pending", index=True)  # pending, processing, succeeded, failed, cancelled
+    payment_data = db.Column(db.Text)  # JSON с данными платежа
+    
+    __table_args__ = (
+        db.CheckConstraint("total >= 0", name="check_order_total_positive"),
+        db.CheckConstraint("delivery_cost >= 0", name="check_delivery_cost_positive"),
+        db.CheckConstraint("status IN ('created', 'paid', 'processing', 'shipped', 'delivered', 'cancelled')", name="check_order_status"),
+        db.CheckConstraint("payment_status IN ('pending', 'processing', 'succeeded', 'failed', 'cancelled')", name="check_payment_status"),
+    )
+    
     __table_args__ = (
         db.Index('idx_order_user', 'user_id'),
         db.Index('idx_order_status', 'status'),
         db.Index('idx_order_created', 'created_at'),
+        db.Index('idx_order_delivery', 'delivery_method'),
+        db.Index('idx_order_payment', 'payment_method'),
+        db.Index('idx_order_payment_status', 'payment_status'),
     )
 
 class OrderItem(db.Model):
@@ -93,6 +122,11 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)  # price at time of order
     product = db.relationship("Product")
+    
+    __table_args__ = (
+        db.CheckConstraint("quantity > 0", name="check_quantity_positive"),
+        db.CheckConstraint("price >= 0", name="check_price_positive"),
+    )
     
     __table_args__ = (
         db.Index('idx_orderitem_order', 'order_id'),

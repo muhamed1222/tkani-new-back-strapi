@@ -47,15 +47,81 @@ def create_app(config_name=None):
     os.makedirs(app.config['WORKS_UPLOAD_FOLDER'], exist_ok=True)
 
     # Инициализация расширений
+    # Применяем настройки connection pooling для PostgreSQL
+    engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {})
+    if engine_options:
+        from sqlalchemy import create_engine
+        from sqlalchemy.pool import QueuePool
+        
+        # Обновляем engine options для SQLAlchemy
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+        if db_uri and 'postgresql' in db_uri:
+            # Для PostgreSQL используем настройки connection pooling
+            app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_options
+    
     db.init_app(app)
     migrate = Migrate(app, db)
+    
+    # Настройка логирования
+    import logging
+    from logging.handlers import RotatingFileHandler
+    
+    if not app.debug:
+        # Настройка логирования для production
+        log_level = app.config.get('LOG_LEVEL', 'WARNING')
+        log_file = app.config.get('LOG_FILE')
+        
+        if log_file:
+            # Логирование в файл с ротацией
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=10240000,  # 10MB
+                backupCount=10
+            )
+            file_handler.setLevel(getattr(logging, log_level.upper(), logging.WARNING))
+            file_handler.setFormatter(logging.Formatter(
+                '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+            ))
+            app.logger.addHandler(file_handler)
+            app.logger.setLevel(getattr(logging, log_level.upper(), logging.WARNING))
+        
+        app.logger.info('Application startup')
+    
+    # Инициализация Sentry для мониторинга ошибок
+    sentry_dsn = app.config.get('SENTRY_DSN')
+    if sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+            
+            sentry_sdk.init(
+                dsn=sentry_dsn,
+                environment=app.config.get('SENTRY_ENVIRONMENT', 'production'),
+                integrations=[
+                    FlaskIntegration(),
+                    SqlalchemyIntegration()
+                ],
+                traces_sample_rate=0.1,  # 10% запросов для трейсинга
+                send_default_pii=False  # Не отправлять персональные данные
+            )
+            app.logger.info('Sentry initialized')
+        except ImportError:
+            app.logger.warning('Sentry SDK not installed. Install with: pip install sentry-sdk[flask]')
+        except Exception as e:
+            app.logger.error(f'Failed to initialize Sentry: {str(e)}')
     
     # JWT
     jwt = JWTManager(app)
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
     
-    # CORS
-    CORS(app, supports_credentials=True)
+    # CORS - настройка для production
+    allowed_origins = app.config.get('ALLOWED_ORIGINS', ['http://localhost:5173'])
+    CORS(app, 
+         supports_credentials=True,
+         origins=allowed_origins,
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         allow_headers=['Content-Type', 'Authorization'])
     
     # Rate Limiting
     limiter = Limiter(
@@ -84,12 +150,14 @@ def create_app(config_name=None):
     api_version = app.config.get('API_VERSION', 'v1')
     api_prefix = f"/api/{api_version}"
     
-    from routes import auth, catalog, cart, orders, works, admin_strapi
+    from routes import auth, catalog, cart, orders, works, admin_strapi, delivery, payment
     
     app.register_blueprint(auth.auth_bp, url_prefix=f"{api_prefix}/auth")
     app.register_blueprint(catalog.catalog_bp, url_prefix=f"{api_prefix}/catalog")
     app.register_blueprint(cart.cart_bp, url_prefix=f"{api_prefix}/cart")
     app.register_blueprint(orders.orders_bp, url_prefix=f"{api_prefix}/orders")
+    app.register_blueprint(delivery.delivery_bp, url_prefix=f"{api_prefix}/delivery")
+    app.register_blueprint(payment.payment_bp, url_prefix=f"{api_prefix}/payment")
     # Используем Strapi-интегрированные админ-роуты
     app.register_blueprint(admin_strapi.admin_strapi_bp, url_prefix=f"{api_prefix}/admin")
     app.register_blueprint(works.works_bp, url_prefix=f"{api_prefix}")
@@ -99,6 +167,8 @@ def create_app(config_name=None):
     app.register_blueprint(catalog.catalog_bp, url_prefix="/api/catalog", name="catalog_legacy")
     app.register_blueprint(cart.cart_bp, url_prefix="/api/cart", name="cart_legacy")
     app.register_blueprint(orders.orders_bp, url_prefix="/api/orders", name="orders_legacy")
+    app.register_blueprint(delivery.delivery_bp, url_prefix="/api/delivery", name="delivery_legacy")
+    app.register_blueprint(payment.payment_bp, url_prefix="/api/payment", name="payment_legacy")
     app.register_blueprint(admin_strapi.admin_strapi_bp, url_prefix="/api/admin", name="admin_legacy")
     app.register_blueprint(works.works_bp, url_prefix="/api", name="works_legacy")
 
