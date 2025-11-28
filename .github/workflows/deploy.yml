@@ -18,13 +18,15 @@ jobs:
       with:
         node-version: 18
 
-    - name: Install dependencies
+    - name: Install Strapi dependencies
+      working-directory: ./strapi
       run: npm install
 
-    - name: Build project
+    - name: Build Strapi
+      working-directory: ./strapi
       run: npm run build
 
-    - name: Upload dist via FTP
+    - name: Upload project via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.6
       with:
         server: ${{ secrets.FTP_HOST }}
@@ -32,10 +34,20 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         protocol: ftp
         port: 21
-        local-dir: ./dist
+        local-dir: ./
         server-dir: ${{ secrets.FTP_PATH }}
         exclude: |
           **/.git*
           **/.github*
           **/node_modules**
+          **/__pycache__**
+          **/*.pyc
+          **/.env*
+          **/backups/**
+          **/migrations/**
+          **/tests/**
+          **/static/avatars/**
+          **/static/products/**
+          strapi/node_modules/**
+          strapi/.cache/**
 
