@@ -1,0 +1,23 @@
+{
+  "name": "audit-log",
+  "version": "1.0.0",
+  "description": "Audit Log plugin for Strapi v5",
+  "main": "./server/src/index.js",
+  "strapi": {
+    "name": "audit-log",
+    "displayName": "Audit Logs",
+    "description": "Логирование изменений в системе",
+    "kind": "plugin",
+    "admin": {
+      "main": "./admin/src/index.js"
+    }
+  },
+  "dependencies": {},
+  "author": {
+    "name": "Centr Tkani"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

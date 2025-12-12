@@ -1,0 +1,28 @@
+{
+  "kind": "collectionType",
+  "collectionName": "notification_recipients",
+  "info": {
+    "singularName": "notification-recipient",
+    "pluralName": "notification-recipients",
+    "displayName": "Получатели уведомлений",
+    "description": "Список получателей Telegram-уведомлений о новых заказах"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "telegram_chat_id": {
+      "type": "string",
+      "required": true
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

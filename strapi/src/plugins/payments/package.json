@@ -1,0 +1,26 @@
+{
+  "name": "payments",
+  "version": "1.0.0",
+  "description": "Payments plugin for Strapi v5",
+  "main": "./server/src/index.js",
+  "strapi": {
+    "name": "payments",
+    "displayName": "Payments",
+    "description": "Интеграция с платежными системами",
+    "kind": "plugin",
+    "admin": {
+      "main": "./admin/src/index.js"
+    }
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cloudpayments": "^1.0.0"
+  },
+  "author": {
+    "name": "Centr Tkani"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

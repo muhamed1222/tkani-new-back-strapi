@@ -1,0 +1,91 @@
+{
+  "name": "strapi-admin",
+  "version": "1.0.0",
+  "description": "Strapi CMS для управления магазином",
+  "private": true,
+  "scripts": {
+    "build": "npx strapi build",
+    "develop": "npx strapi develop",
+    "start": "npx strapi start",
+    "strapi": "npx strapi"
+  },
+  "dependencies": {
+    "@sentry/node": "^10.29.0",
+    "@sentry/react": "^10.29.0",
+    "@strapi/plugin-users-permissions": "5.31.3",
+    "@strapi/provider-email-nodemailer": "^5.31.3",
+    "@strapi/strapi": "^5.31.3",
+    "better-sqlite3": "^12.4.1",
+    "cloudpayments": "^6.0.1",
+    "mime-types": "^3.0.2",
+    "nodemailer": "^7.0.11",
+    "normalize-package-data": "^8.0.0",
+    "pg": "^8.16.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.2",
+    "strapi-google-translator": "^1.0.0",
+    "styled-components": "^6.1.19"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=6.0.0"
+  },
+  "overrides": {
+    "@strapi/core": {
+      "glob": "^10.5.0",
+      "koa": "^2.16.3"
+    },
+    "@strapi/admin": {
+      "glob": "^10.5.0",
+      "koa": "^2.16.3"
+    },
+    "@strapi/plugin-users-permissions": {
+      "koa": "^2.16.3"
+    },
+    "@strapi/content-manager": {
+      "koa": "^2.16.3"
+    },
+    "@strapi/content-type-builder": {
+      "ai": "^5.0.52",
+      "@ai-sdk/react": {
+        "ai": "^5.0.52"
+      }
+    },
+    "@strapi/provider-email-nodemailer": {
+      "nodemailer": "^7.0.11"
+    },
+    "@strapi/types": {
+      "koa": "^2.16.3"
+    },
+    "@strapi/generators": {
+      "tmp": "^0.2.4"
+    },
+    "inquirer": {
+      "external-editor": {
+        "tmp": "^0.2.4"
+      },
+      "tmp": "^0.2.4"
+    },
+    "external-editor": {
+      "tmp": "^0.2.4"
+    },
+    "jscodeshift": {
+      "tmp": "^0.2.4"
+    },
+    "vite": "^5.4.21",
+    "@strapi/strapi": {
+      "vite": "^5.4.21"
+    },
+    "glob": "^10.5.0",
+    "koa": "^2.16.3",
+    "ai": "^5.0.52",
+    "esbuild": "^0.25.0",
+    "nodemailer": "^7.0.11",
+    "tmp": "^0.2.4",
+    "@ai-sdk/react": {
+      "ai": "^5.0.52"
+    }
+  },
+  "license": "MIT"
+}

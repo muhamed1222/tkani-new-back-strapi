@@ -1,0 +1,27 @@
+{
+  "name": "strapi-plugin-delivery",
+  "version": "1.0.0",
+  "description": "Delivery services integration (CDEK, Russian Post)",
+  "strapi": {
+    "name": "delivery",
+    "displayName": "Delivery",
+    "description": "Integration with CDEK and Russian Post APIs",
+    "kind": "plugin"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "author": {
+    "name": "Center Tkani"
+  },
+  "maintainers": [
+    {
+      "name": "Center Tkani"
+    }
+  ],
+  "engines": {
+    "node": ">=18.0.0 <=20.x.x",
+    "npm": ">=6.0.0"
+  },
+  "license": "MIT"
+}

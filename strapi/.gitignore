@@ -1,0 +1,16 @@
+# Strapi files
+.tmp/
+.cache/
+build/
+dist/
+.env
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Database
+*.db
+*.sqlite
+

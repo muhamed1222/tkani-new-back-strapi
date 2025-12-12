@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "audit_logs",
+  "info": {
+    "singularName": "audit-log",
+    "pluralName": "audit-logs",
+    "displayName": "Audit Logs",
+    "description": "Логи изменений в системе"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "action": {
+      "type": "enumeration",
+      "enum": ["create", "update", "delete", "publish", "unpublish"],
+      "required": true
+    },
+    "contentType": {
+      "type": "string",
+      "required": true
+    },
+    "contentId": {
+      "type": "integer",
+      "required": true
+    },
+    "userId": {
+      "type": "integer"
+    },
+    "userEmail": {
+      "type": "string"
+    },
+    "changes": {
+      "type": "json"
+    },
+    "previousData": {
+      "type": "json"
+    },
+    "newData": {
+      "type": "json"
+    },
+    "ip": {
+      "type": "string"
+    },
+    "userAgent": {
+      "type": "string"
+    }
+  }
+}

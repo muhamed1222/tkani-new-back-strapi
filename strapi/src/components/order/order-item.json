@@ -1,0 +1,40 @@
+{
+  "collectionName": "components_order_order_items",
+  "info": {
+    "displayName": "Элемент заказа",
+    "description": "Товар в заказе с метражом"
+  },
+  "options": {},
+  "attributes": {
+    "product": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::product.product"
+    },
+    "quantity": {
+      "type": "integer",
+      "required": false,
+      "min": 1
+    },
+    "meters": {
+      "type": "decimal",
+      "required": true,
+      "min": 0.1
+    },
+    "price": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "price_per_meter": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "total": {
+      "type": "decimal",
+      "required": false,
+      "private": true
+    }
+  }
+}

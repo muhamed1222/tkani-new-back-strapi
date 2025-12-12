@@ -1,0 +1,23 @@
+{
+  "name": "seo",
+  "version": "1.0.0",
+  "description": "SEO plugin for Strapi v5",
+  "main": "./server/src/index.js",
+  "strapi": {
+    "name": "seo",
+    "displayName": "SEO",
+    "description": "SEO оптимизация для продуктов и категорий",
+    "kind": "plugin",
+    "admin": {
+      "main": "./admin/src/index.js"
+    }
+  },
+  "dependencies": {},
+  "author": {
+    "name": "Centr Tkani"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

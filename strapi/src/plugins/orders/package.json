@@ -1,0 +1,23 @@
+{
+  "name": "orders",
+  "version": "1.0.0",
+  "description": "Orders Manager plugin for Strapi v5",
+  "main": "./server/src/index.js",
+  "strapi": {
+    "name": "orders",
+    "displayName": "Orders Manager",
+    "description": "Управление заказами",
+    "kind": "plugin",
+    "admin": {
+      "main": "./admin/src/index.js"
+    }
+  },
+  "dependencies": {},
+  "author": {
+    "name": "Centr Tkani"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}
