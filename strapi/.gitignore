@@ -3,7 +3,6 @@
 .cache/
 build/
 dist/
-.env
 
 # Node
 node_modules/
