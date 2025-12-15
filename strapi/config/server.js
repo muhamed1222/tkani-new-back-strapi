@@ -7,7 +7,5 @@ module.exports = ({ env }) => ({
   webhooks: {
     populateRelations: env.bool('WEBHOOKS_POPULATE_RELATIONS', false),
   },
-  // CORS полностью настраивается в config/middlewares.js
-  // settings.cors здесь не используется, так как используется middleware
 });
 

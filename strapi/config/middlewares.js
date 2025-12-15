@@ -14,7 +14,7 @@ module.exports = ({ env }) => [
     config: {
       origin: [
         'http://localhost:5173',
-        'http://localhost:5174', // ← ДОБАВЛЕН!
+        'http://localhost:5174', 
         'http://localhost:5175',
         'http://localhost:5001',
         'https://centertkani.ru',

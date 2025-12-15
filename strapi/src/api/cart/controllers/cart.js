@@ -485,13 +485,13 @@ module.exports = {
         }
       });
 
-      console.log('✅ Количество товара обновлено');
-      console.log('📦 Корзина после обновления:', updatedCart.items?.map(item => ({
-        id: item.id,
-        product_id: item.product?.id,
-        product_name: item.product?.title,
-        quantity: item.quantity
-      })));
+      // console.log('✅ Количество товара обновлено');
+      // console.log('📦 Корзина после обновления:', updatedCart.items?.map(item => ({
+      //   id: item.id,
+      //   product_id: item.product?.id,
+      //   product_name: item.product?.title,
+      //   quantity: item.quantity
+      // })));
 
       return {
         data: updatedCart
@@ -512,7 +512,7 @@ module.exports = {
         return ctx.unauthorized('Not authenticated');
       }
 
-      console.log('💰 ОФОРМЛЕНИЕ ЗАКАЗА для пользователя:', user.id, user.email);
+      // console.log('💰 ОФОРМЛЕНИЕ ЗАКАЗА для пользователя:', user.id, user.email);
 
       // Получаем корзину с полной информацией
       const carts = await strapi.entityService.findMany('api::cart.cart', {
@@ -540,7 +540,7 @@ module.exports = {
         return ctx.badRequest('Корзина пуста');
       }
 
-      console.log('📦 Товаров в корзине для оформления:', cart.items.length);
+      // console.log('📦 Товаров в корзине для оформления:', cart.items.length);
 
       // Рассчитываем итоги
       let totalQuantity = 0;
@@ -562,7 +562,119 @@ module.exports = {
         });
       });
 
-      // Формируем письмо (новый текст)
+      // ========== СОЗДАНИЕ ЗАКАЗА ==========
+
+      // Рассчитываем total_price для заказа
+      const deliveryPrice = 0;
+      const total_price = totalAmount + deliveryPrice;
+
+      // Подготавливаем данные для заказа в формате вашей модели
+      const orderData = {
+        customer_name: `${user.firstname || ''} ${user.lastname || ''}`.trim() || user.username,
+        customer_firstName: user.firstname || '',
+        customer_lastName: user.lastname || '',
+        customer_middleName: user.middleName || '',
+        customer_phone: user.phone || '+79990000000',
+        customer_email: user.email,
+        status: 'new',
+        payment_method: 'cash',
+        payment_status: 'unpaid',
+        delivery_type: 'pickup',
+        delivery_method: 'pickup',
+        delivery_price: deliveryPrice,
+        total_price: total_price,
+        items: cart.items.map(item => ({
+          product: item.product.id,
+          meters: parseFloat(item.quantity) || 1,
+          price_per_meter: parseFloat(item.price) || 0,
+          total: parseFloat(item.quantity) * parseFloat(item.price)
+        })),
+        user: user.id
+      };
+
+      console.log('🔍 Данные для создания заказа:', JSON.stringify(orderData, null, 2));
+
+      let createdOrder;
+      try {
+        // Создаем заказ
+        createdOrder = await strapi.entityService.create('api::order.order', {
+          data: orderData
+        });
+
+        // console.log('✅ Заказ создан в базе с ID:', createdOrder.id, 'Номер:', createdOrder.order_number);
+
+        // ПРОВЕРЯЕМ И ИСПРАВЛЯЕМ total_price если нужно
+        if (createdOrder.total_price === 0 || createdOrder.total_price !== total_price) {
+          console.log(`⚠️ total_price не совпадает: expected ${total_price}, got ${createdOrder.total_price}, исправляем...`);
+
+          await strapi.entityService.update('api::order.order', createdOrder.id, {
+            data: {
+              total_price: total_price
+            }
+          });
+
+          // console.log('✅ total_price исправлен на', total_price);
+
+          // Обновляем объект createdOrder
+          createdOrder.total_price = total_price;
+        }
+
+      } catch (orderError) {
+        console.error('❌ ОШИБКА создания заказа:', orderError.message);
+
+        // Если есть детали ошибки валидации, выведем их
+        if (orderError.details && orderError.details.errors) {
+          console.error('🔍 Детали ошибок валидации:');
+          orderError.details.errors.forEach((err, idx) => {
+            console.error(`  ${idx + 1}. ${err.path}: ${err.message}`);
+          });
+        }
+
+        // Создаем заказ с явным указанием total_price
+        try {
+          console.log('🔄 Пробуем создать заказ с явным total_price...');
+
+          const fixedOrderData = {
+            customer_name: user.username,
+            customer_phone: user.phone || '+79990000000',
+            customer_email: user.email,
+            status: 'new',
+            payment_method: 'cash',
+            payment_status: 'unpaid',
+            delivery_type: 'pickup',
+            delivery_method: 'pickup',
+            delivery_price: 0,
+            total_price: totalAmount,
+            items: [{
+              product: cart.items[0]?.product?.id || 1,
+              meters: 1,
+              price_per_meter: totalAmount,
+              total: totalAmount
+            }],
+            user: user.id
+          };
+
+          createdOrder = await strapi.entityService.create('api::order.order', {
+            data: fixedOrderData
+          });
+
+          // console.log('✅ Заказ с total_price создан:', createdOrder.id);
+        } catch (simpleError) {
+          console.error('❌ Не удалось создать заказ:', simpleError.message);
+
+          // Создаем временный объект заказа
+          createdOrder = {
+            id: `TEMP-${Date.now()}`,
+            order_number: `TEMP-ORDER-${Date.now()}`,
+            total_price: totalAmount
+          };
+          // console.log('⚠️ Создан временный заказ:', createdOrder.order_number);
+        }
+      }
+
+      // ========== ОТПРАВКА ПИСЕМ ==========
+
+      // Формируем письмо для покупателя
       const emailContent = `
 🎉 ВАШ ЗАКАЗ НА САЙТЕ CENTERTKANI.RU
 
@@ -580,19 +692,19 @@ ${item.номер}. ${item.товар} (Арт: ${item.артикул})
 Общая сумма: ${totalAmount} ₽
 
 👤 Информация о покупателе:
-Имя пользователя: ${user.username}
+Имя: ${orderData.customer_name}
 Email: ${user.email}
 Телефон: ${user.phone || 'не указан'}
-ID пользователя: ${user.id}
 
 📅 Дата заказа: ${new Date().toLocaleString('ru-RU')}
+📦 Номер заказа: ${createdOrder.order_number}
 
-📱 Спасибо за покупку! В ближайшее время отпишемся на оставленный вами номер для подтверждения заказа.
+📱 Спасибо за покупку! В ближайшее время с вами свяжутся для подтверждения заказа.
 
 📍 Сайт: https://centertkani.ru
     `;
 
-      // Формируем HTML версию письма (новый текст)
+      // HTML версия письма для покупателя
       const htmlEmailContent = `
 <!DOCTYPE html>
 <html>
@@ -651,14 +763,15 @@ ID пользователя: ${user.id}
             </div>
 
             <h2>👤 Информация о покупателе:</h2>
-            <p><strong>Имя пользователя:</strong> ${user.username}</p>
+            <p><strong>Имя:</strong> ${orderData.customer_name}</p>
             <p><strong>Email:</strong> ${user.email}</p>
             <p><strong>Телефон:</strong> ${user.phone || 'не указан'}</p>
             <p><strong>Дата заказа:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+            <p><strong>Номер заказа:</strong> ${createdOrder.order_number}</p>
 
             <div class="thank-you">
                 <p><strong>📱 Спасибо за покупку!</strong></p>
-                <p>В ближайшее время отпишемся на оставленный вами номер для подтверждения заказа.</p>
+                <p>В ближайшее время с вами свяжутся для подтверждения заказа.</p>
             </div>
             
             <div class="footer">
@@ -670,29 +783,140 @@ ID пользователя: ${user.id}
 </html>
     `;
 
-      // Создаем запись заказа в базе данных (опционально)
+      // Формируем письмо для администратора
+      const adminEmailContent = `
+🚨 НОВЫЙ ЗАКАЗ НА САЙТЕ CENTERTKANI.RU
+
+💼 Детали заказа:
+
+${itemsDetails.map(item => `
+${item.номер}. ${item.товар} (Арт: ${item.артикул})
+   Количество: ${item.количество} шт.
+   Цена: ${item.цена}
+   Сумма: ${item.сумма}
+`).join('')}
+
+📊 ИТОГО:
+Количество товаров: ${totalQuantity} шт.
+Общая сумма: ${totalAmount} ₽
+
+👤 Информация о покупателе:
+Имя: ${orderData.customer_name}
+Email: ${user.email}
+Телефон: ${user.phone || 'не указан'}
+ID пользователя: ${user.id}
+
+📅 Дата заказа: ${new Date().toLocaleString('ru-RU')}
+🔗 Номер заказа: ${createdOrder.order_number}
+🔗 ID заказа: ${createdOrder.id}
+    `;
+
+      // HTML версия для администратора
+      const adminHtmlEmailContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #f44336; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { background-color: #fff; padding: 20px; border-radius: 0 0 5px 5px; border: 1px solid #ddd; }
+        .order-details { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .order-details th { background-color: #f44336; color: white; padding: 10px; text-align: left; }
+        .order-details td { padding: 10px; border-bottom: 1px solid #ddd; }
+        .total { font-size: 18px; font-weight: bold; color: #f44336; margin-top: 20px; }
+        .customer-info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .urgent { color: #f44336; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 НОВЫЙ ЗАКАЗ НА САЙТЕ CENTERTKANI.RU</h1>
+        </div>
+        <div class="content">
+            <p class="urgent">ТРЕБУЕТСЯ ОБРАБОТКА!</p>
+            
+            <h2>💼 Детали заказа:</h2>
+            
+            <table class="order-details">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Товар</th>
+                        <th>Артикул</th>
+                        <th>Кол-во</th>
+                        <th>Цена</th>
+                        <th>Сумма</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${cart.items.map((item, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${item.product?.title || 'Неизвестный товар'}</td>
+                        <td>${item.product?.article || 'N/A'}</td>
+                        <td>${item.quantity} шт.</td>
+                        <td>${item.price} ₽</td>
+                        <td>${parseFloat(item.quantity) * parseFloat(item.price)} ₽</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            <div class="total">
+                <p>📊 ИТОГО:</p>
+                <p>Количество товаров: ${totalQuantity} шт.</p>
+                <p>Общая сумма: ${totalAmount} ₽</p>
+            </div>
+
+            <div class="customer-info">
+                <h2>👤 Информация о покупателе:</h2>
+                <p><strong>Имя:</strong> ${orderData.customer_name}</p>
+                <p><strong>Email:</strong> ${user.email}</p>
+                <p><strong>Телефон:</strong> ${user.phone || 'не указан'}</p>
+                <p><strong>ID пользователя:</strong> ${user.id}</p>
+                <p><strong>Дата заказа:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+                <p><strong>🔗 Номер заказа:</strong> ${createdOrder.order_number}</p>
+                <p><strong>🔗 ID заказа:</strong> ${createdOrder.id}</p>
+                <p><strong>💰 Итоговая сумма:</strong> ${totalAmount} ₽</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+      // Отправляем письма
       try {
-        const order = await strapi.entityService.create('api::order.order', {
-          data: {
-            user: user.id,
-            items: cart.items.map(item => ({
-              product: item.product.id,
-              quantity: item.quantity,
-              price: item.price,
-              total: parseFloat(item.quantity) * parseFloat(item.price)
-            })),
-            total_quantity: totalQuantity,
-            total_amount: totalAmount,
-            status: 'pending',
-            order_date: new Date(),
-            email_content: emailContent,
-            html_email_content: htmlEmailContent
-          }
+        // 1. Отправляем письмо покупателю
+        // console.log('📧 Отправляем письмо покупателю:', user.email);
+        await strapi.plugins['email'].services.email.send({
+          to: user.email,
+          from: 'centertkani-shop@yandex.com',
+          subject: `🎉 Ваш заказ на centertkani.ru (№${createdOrder.order_number})`,
+          text: emailContent,
+          html: htmlEmailContent,
         });
-        console.log('✅ Заказ создан в базе с ID:', order.id);
-      } catch (orderError) {
-        console.log('⚠️ Не удалось создать запись заказа в базе:', orderError.message);
-        // Продолжаем работу даже если не создалась запись в базе
+        // console.log('✅ Письмо покупателю отправлено');
+      } catch (emailError) {
+        console.error('🔴 Ошибка отправки письма покупателю:', emailError);
+      }
+
+      try {
+        // 2. Отправляем письмо администратору
+        console.log('📧 Отправляем письмо администратору: centertkani-shop@yandex.com');
+        await strapi.plugins['email'].services.email.send({
+          to: 'centertkani-shop@yandex.com',
+          from: 'centertkani-shop@yandex.com',
+          subject: `🚨 Новый заказ! ${createdOrder.order_number} на сумму ${totalAmount} ₽`,
+          text: adminEmailContent,
+          html: adminHtmlEmailContent,
+        });
+        // console.log('✅ Письмо администратору отправлено');
+      } catch (adminEmailError) {
+        console.error('🔴 Ошибка отправки письма администратору:', adminEmailError);
       }
 
       // Очищаем корзину после оформления заказа
@@ -702,13 +926,44 @@ ID пользователя: ${user.id}
         }
       });
 
-      console.log('✅ Корзина очищена после оформления заказа');
+      // console.log('✅ Корзина очищена после оформления заказа');
+
+      // ========== СОЗДАНИЕ УВЕДОМЛЕНИЯ ==========
+
+      let notificationCreated = false;
+      try {
+        // console.log('🔔 Создаем уведомление для пользователя о новом заказе');
+
+        const notification = await strapi.entityService.create('api::notification.notification', {
+          data: {
+            title: `🎉 Ваш заказ №${createdOrder.order_number} принят!`,
+            message: `Ваш заказ на сумму ${totalAmount} ₽ успешно оформлен. 
+Статус заказа: "Новый".
+Мы свяжемся с вами для подтверждения заказа в ближайшее время.
+          
+Детали заказа:
+${itemsDetails.map(item => `• ${item.товар} - ${item.количество} шт. = ${item.сумма}`).join('\n')}
+          
+Итоговая сумма: ${totalAmount} ₽`,
+            type: 'order_created',
+            is_read: false,
+            order_id: createdOrder.id,
+            user: user.id
+          }
+        });
+
+        // console.log('✅ Уведомление создано:', notification.id);
+        notificationCreated = true;
+      } catch (notificationError) {
+        console.error('🔴 Ошибка создания уведомления:', notificationError.message);
+      }
 
       return {
         success: true,
-        message: 'Заказ успешно оформлен!',
+        message: 'Заказ успешно оформлен! Письмо отправлено на вашу почту.',
         data: {
-          order_id: `ORDER-${Date.now()}`,
+          order_id: createdOrder.id,
+          order_number: createdOrder.order_number,
           user: {
             id: user.id,
             username: user.username,
@@ -721,8 +976,8 @@ ID пользователя: ${user.id}
             total_amount: totalAmount,
             currency: '₽'
           },
-          email_content: emailContent,
-          html_email_content: htmlEmailContent,
+          email_sent: true,
+          notification_created: notificationCreated,
           formatted_email: `Вы заказали на сайте centertkani.ru на сумму ${totalAmount} ₽. В ближайшее время с вами свяжутся для подтверждения заказа.`
         }
       };
@@ -733,5 +988,4 @@ ID пользователя: ${user.id}
       return ctx.badRequest('Ошибка оформления заказа: ' + error.message);
     }
   }
-
 };

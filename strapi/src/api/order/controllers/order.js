@@ -3,10 +3,6 @@
 const { createCoreController } = require('@strapi/strapi').factories;
 
 module.exports = createCoreController('api::order.order', ({ strapi }) => ({
-  /**
-   * Создание заказа
-   * Автоматически генерирует order_number и пересчитывает totals
-   */
   async create(ctx) {
     try {
       const { data } = ctx.request.body;
@@ -15,18 +11,18 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (!data.customer_name || !data.customer_phone || !data.customer_email) {
         return ctx.badRequest('Необходимо указать имя, телефон и email клиента');
       }
-      
+
       // Если указаны firstName и lastName, формируем полное имя (с учетом отчества)
       if (data.customer_firstName && data.customer_lastName && !data.customer_name) {
         const nameParts = [data.customer_firstName, data.customer_middleName, data.customer_lastName].filter(Boolean);
         data.customer_name = nameParts.join(' ').trim();
       }
-      
+
       // Устанавливаем delivery_type на основе delivery_method
       if (data.delivery_method && !data.delivery_type) {
         data.delivery_type = data.delivery_method === 'pickup' ? 'pickup' : 'delivery';
       }
-      
+
       // Валидация адреса доставки (если не самовывоз)
       if (data.delivery_type === 'delivery' && data.delivery_method !== 'pickup') {
         if (!data.delivery_address || !data.delivery_city || !data.delivery_postcode) {
@@ -43,18 +39,18 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         if (!item.product) {
           return ctx.badRequest('Каждый товар должен иметь связь с продуктом');
         }
-        
+
         // Поддержка обоих форматов: quantity/price и meters/price_per_meter
         if (item.quantity !== undefined && !item.meters) {
           // Преобразуем quantity в meters (для совместимости)
           item.meters = parseFloat(item.quantity) || 1;
         }
-        
+
         if (item.price !== undefined && !item.price_per_meter) {
           // Преобразуем price в price_per_meter
           item.price_per_meter = parseFloat(item.price) || 0;
         }
-        
+
         if (!item.meters || item.meters < 0.1) {
           return ctx.badRequest('Метраж должен быть не менее 0.1');
         }
@@ -78,11 +74,6 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (ctx.state.user) {
         data.user = ctx.state.user.id;
       }
-
-      // Lifecycle hooks автоматически:
-      // - сгенерируют order_number
-      // - рассчитают total для каждого item
-      // - рассчитают total_price
 
       const order = await strapi.entityService.create('api::order.order', {
         data,
@@ -252,16 +243,16 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
           if (!item.product) {
             return ctx.badRequest('Каждый товар должен иметь связь с продуктом');
           }
-          
+
           // Поддержка обоих форматов: quantity/price и meters/price_per_meter
           if (item.quantity !== undefined && !item.meters) {
             item.meters = parseFloat(item.quantity) || 1;
           }
-          
+
           if (item.price !== undefined && !item.price_per_meter) {
             item.price_per_meter = parseFloat(item.price) || 0;
           }
-          
+
           if (!item.meters || item.meters < 0.1) {
             return ctx.badRequest('Метраж должен быть не менее 0.1');
           }

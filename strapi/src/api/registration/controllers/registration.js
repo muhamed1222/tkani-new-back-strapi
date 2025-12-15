@@ -50,15 +50,8 @@ module.exports = {
         role: 1
       };
 
-      console.log('🟡 Создаем пользователя с данными:', userData);
-
       // Создаем пользователя
       const user = await userService.add(userData);
-
-      console.log('🟢 Базовый пользователь создан:', user.id);
-
-      // Теперь обновляем пользователя дополнительными полями через entityService
-      // Это обходит возможные ограничения валидации
       const updatedUser = await strapi.entityService.update(
         'plugin::users-permissions.user',
         user.id,
@@ -69,7 +62,7 @@ module.exports = {
             middleName: middleName || null,
             phone: phone
           },
-          populate: ['role'] // Добавляем populate для получения полных данных
+          populate: ['role']
         }
       );
 

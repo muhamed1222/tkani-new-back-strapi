@@ -1,16 +1,6 @@
-/**
- * Кастомизация темы Strapi
- * Изменение акцентного цвета с #4945ff на ваш цвет
- * 
- * ИНСТРУКЦИЯ: Замените PRIMARY_COLOR ниже на ваш акцентный цвет в формате HEX
- */
 
-// ⬇️ ЗАМЕНИТЕ ЭТОТ ЦВЕТ НА ВАШ АКЦЕНТНЫЙ ЦВЕТ ⬇️
 const PRIMARY_COLOR = '#9B1E1C'; // Например: '#FF6B6B', '#4ECDC4', '#45B7D1', '#FF6B35'
 
-/**
- * Функция для изменения яркости цвета
- */
 function adjustBrightness(color, percent) {
   const num = parseInt(color.replace('#', ''), 16);
   const amt = Math.round(2.55 * percent);
