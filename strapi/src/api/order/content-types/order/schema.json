@@ -27,8 +27,7 @@
         "completed",
         "canceled"
       ],
-      "default": "new",
-      "required": true
+      "default": "new"
     },
     "customer_name": {
       "type": "string",

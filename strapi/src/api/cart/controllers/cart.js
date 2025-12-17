@@ -598,17 +598,22 @@ module.exports = {
         customer_phone: checkoutData.customer_phone || user.phone || '+79990000000',
         customer_company: checkoutData.customer_company || '',
 
-        // Адресные данные
+        // Адресные данные клиента (для биллинга)
         customer_city: checkoutData.customer_city || '',
         customer_address: checkoutData.customer_address || '',
         customer_postcode: checkoutData.customer_postcode || '',
         customer_region: checkoutData.customer_region || '',
 
-        // Данные доставки
+        // Данные доставки (это те поля, которые должны заполняться в схеме Order)
         delivery_method: checkoutData.delivery_method || 'pickup',
         delivery_address: checkoutData.delivery_address || '',
         delivery_type: checkoutData.delivery_type || 'pickup',
         delivery_price: checkoutData.delivery_price || 0,
+
+        // ВАЖНОЕ ИСПРАВЛЕНИЕ: Добавляем поля delivery_city, delivery_postcode, delivery_region
+        delivery_city: checkoutData.delivery_city || checkoutData.customer_city || '',
+        delivery_postcode: checkoutData.delivery_postcode || checkoutData.customer_postcode || '',
+        delivery_region: checkoutData.delivery_region || checkoutData.customer_region || '',
 
         // Данные оплаты
         payment_method: checkoutData.payment_method || 'cash',
@@ -635,6 +640,15 @@ module.exports = {
 
         user: user.id
       };
+
+      // ========== ВАЖНОЕ ДОБАВЛЕНИЕ: ГЕНЕРАЦИЯ НОМЕРА ЗАКАЗА ==========
+      if (!orderData.order_number) {
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substr(2, 9).toUpperCase();
+        orderData.order_number = `ORDER-${timestamp}-${randomStr}`;
+        console.log('🔢 Сгенерирован номер заказа в checkout:', orderData.order_number);
+      }
+      // ========== КОНЕЦ ДОБАВЛЕНИЯ ==========
 
       console.log('🔍 Данные для создания заказа:', JSON.stringify(orderData, null, 2));
 
@@ -694,6 +708,14 @@ module.exports = {
             user: user.id
           };
 
+          // ========== ТАКЖЕ ДОБАВЛЯЕМ ГЕНЕРАЦИЮ НОМЕРА ЗДЕСЬ ==========
+          if (!fixedOrderData.order_number) {
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substr(2, 9).toUpperCase();
+            fixedOrderData.order_number = `ORDER-${timestamp}-${randomStr}`;
+            console.log('🔢 Сгенерирован номер заказа для fixedOrderData:', fixedOrderData.order_number);
+          }
+
           createdOrder = await strapi.entityService.create('api::order.order', {
             data: fixedOrderData
           });
@@ -702,13 +724,18 @@ module.exports = {
           console.error('❌ Не удалось создать заказ:', simpleError.message);
 
           // Создаем временный объект заказа
+          const timestamp = Date.now();
+          const randomStr = Math.random().toString(36).substr(2, 9).toUpperCase();
+          const tempOrderNumber = `TEMP-ORDER-${timestamp}-${randomStr}`;
+
           createdOrder = {
-            id: `TEMP-${Date.now()}`,
-            order_number: `TEMP-ORDER-${Date.now()}`,
+            id: `TEMP-${timestamp}`,
+            order_number: tempOrderNumber,
             total_price: checkoutData.total || totalAmount
           };
         }
       }
+
 
       // ========== ОТПРАВКА ПИСЕМ ==========
 

@@ -699,7 +699,6 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
         'canceled',
       ]
     > &
-      Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'new'>;
     total_price: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
