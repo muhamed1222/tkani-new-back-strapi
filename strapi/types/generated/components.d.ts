@@ -52,8 +52,7 @@ export interface OrderOrderItem extends Struct.ComponentSchema {
         },
         number
       >;
-    product: Schema.Attribute.Relation<'oneToOne', 'api::product.product'> &
-      Schema.Attribute.Required;
+    product: Schema.Attribute.Relation<'oneToOne', 'api::product.product'>;
     quantity: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
         {

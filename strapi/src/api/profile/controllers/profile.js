@@ -1,23 +1,22 @@
-// strapi/src/api/profile/controllers/profile.js
 'use strict';
 
 module.exports = {
   async update(ctx) {
     try {
       console.log('🔄 Обновление профиля - начало');
-      console.log('🔐 User state:', ctx.state.user);
 
+      // Получаем пользователя из JWT токена
       const user = ctx.state.user;
 
       if (!user) {
         console.log('❌ Пользователь не авторизован');
-        return ctx.unauthorized('Not authenticated');
+        return ctx.unauthorized('Не авторизован');
       }
 
-      const { firstName, lastName, middleName, email, phone, avatar } = ctx.request.body;
+      const { firstName, lastName, middleName, email, phone } = ctx.request.body;
 
       console.log('🔄 Обновление профиля для пользователя:', user.id);
-      console.log('📝 Новые данные:', { firstName, lastName, middleName, email, phone, avatar });
+      console.log('📝 Новые данные:', { firstName, lastName, middleName, email, phone });
 
       // Валидация email
       if (email) {
@@ -50,47 +49,45 @@ module.exports = {
         }
       }
 
-      // Обновляем данные - используем правильные имена полей для Strapi
+      // Обновляем данные
       const updateData = {};
-      if (firstName !== undefined) updateData.firstname = firstName;
-      if (lastName !== undefined) updateData.lastname = lastName;
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
       if (middleName !== undefined) updateData.middleName = middleName;
       if (email !== undefined) updateData.email = email.toLowerCase();
       if (phone !== undefined) updateData.phone = phone.trim();
-      if (avatar !== undefined) updateData.avatar = avatar; // Поддержка обновления аватара
 
       console.log('🔄 Данные для обновления:', updateData);
 
-      const updatedUser = await strapi.entityService.update(
-        'plugin::users-permissions.user',
+      // Используем правильный метод для обновления
+      const updatedUser = await strapi.plugins['users-permissions'].services.user.edit(
         user.id,
-        {
-          data: updateData,
-          populate: ['role', 'avatar'] // Добавляем populate для получения полных данных включая аватар
-        }
+        updateData
       );
 
       console.log('✅ Профиль успешно обновлен:', {
         id: updatedUser.id,
-        firstname: updatedUser.firstname,
-        lastname: updatedUser.lastname,
-        middleName: updatedUser.middleName,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
         email: updatedUser.email,
-        phone: updatedUser.phone // Добавляем телефон в логи
+        phone: updatedUser.phone
       });
 
       // Убираем чувствительные данные
-      const { password, resetPasswordToken, confirmationToken, ...safeUser } = updatedUser;
+      const { password, resetPasswordToken, confirmationToken, provider, ...safeUser } = updatedUser;
 
-      ctx.send({
+      return {
         success: true,
         message: 'Профиль успешно обновлен',
         user: safeUser
-      });
+      };
 
     } catch (error) {
       console.error('❌ Ошибка обновления профиля:', error);
-      ctx.badRequest('Ошибка обновления: ' + error.message);
+      return {
+        success: false,
+        error: 'Ошибка обновления профиля: ' + error.message
+      };
     }
   },
 
@@ -119,9 +116,9 @@ module.exports = {
         id: fullUser.id,
         username: fullUser.username,
         email: fullUser.email,
-        firstname: fullUser.firstname,
-        lastname: fullUser.lastname,
-        phone: fullUser.phone, // Добавляем телефон в логи
+        firstName: fullUser.firstName,
+        lastName: fullUser.lastName,
+        phone: fullUser.phone,
         role: fullUser.role
       });
 

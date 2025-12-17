@@ -512,7 +512,10 @@ module.exports = {
         return ctx.unauthorized('Not authenticated');
       }
 
-      // console.log('💰 ОФОРМЛЕНИЕ ЗАКАЗА для пользователя:', user.id, user.email);
+      // Получаем данные из формы
+      const checkoutData = ctx.request.body;
+
+      console.log('📦 Данные заказа от фронтенда:', JSON.stringify(checkoutData, null, 2));
 
       // Получаем корзину с полной информацией
       const carts = await strapi.entityService.findMany('api::cart.cart', {
@@ -540,8 +543,6 @@ module.exports = {
         return ctx.badRequest('Корзина пуста');
       }
 
-      // console.log('📦 Товаров в корзине для оформления:', cart.items.length);
-
       // Рассчитываем итоги
       let totalQuantity = 0;
       let totalAmount = 0;
@@ -562,33 +563,76 @@ module.exports = {
         });
       });
 
+      // Вспомогательные функции для названий методов
+      const getDeliveryMethodName = (method) => {
+        const methods = {
+          'pickup': 'Самовывоз',
+          'russian_post': 'Почта России',
+          'cdek': 'СДЭК',
+          'ozon': 'Ozon',
+          'courier': 'Курьерская доставка'
+        };
+        return methods[method] || method;
+      };
+
+      const getPaymentMethodName = (method) => {
+        const methods = {
+          'card': 'Банковская карта',
+          'cash': 'Наличные',
+          'sbp': 'СБП',
+          'card_online': 'Онлайн карта',
+          'invoice': 'По счету'
+        };
+        return methods[method] || method;
+      };
+
       // ========== СОЗДАНИЕ ЗАКАЗА ==========
 
-      // Рассчитываем total_price для заказа
-      const deliveryPrice = 0;
-      const total_price = totalAmount + deliveryPrice;
-
-      // Подготавливаем данные для заказа в формате вашей модели
+      // Используем данные из формы, а не из профиля пользователя
       const orderData = {
-        customer_name: `${user.firstname || ''} ${user.lastname || ''}`.trim() || user.username,
-        customer_firstName: user.firstname || '',
-        customer_lastName: user.lastname || '',
-        customer_middleName: user.middleName || '',
-        customer_phone: user.phone || '+79990000000',
-        customer_email: user.email,
+        customer_name: checkoutData.customer_name || `${user.firstname || ''} ${user.lastname || ''}`.trim() || user.username,
+        customer_firstName: checkoutData.customer_firstName || user.firstname || '',
+        customer_lastName: checkoutData.customer_lastName || user.lastname || '',
+        customer_middleName: checkoutData.customer_middleName || user.middleName || '',
+        customer_email: checkoutData.customer_email || user.email,
+        customer_phone: checkoutData.customer_phone || user.phone || '+79990000000',
+        customer_company: checkoutData.customer_company || '',
+
+        // Адресные данные
+        customer_city: checkoutData.customer_city || '',
+        customer_address: checkoutData.customer_address || '',
+        customer_postcode: checkoutData.customer_postcode || '',
+        customer_region: checkoutData.customer_region || '',
+
+        // Данные доставки
+        delivery_method: checkoutData.delivery_method || 'pickup',
+        delivery_address: checkoutData.delivery_address || '',
+        delivery_type: checkoutData.delivery_type || 'pickup',
+        delivery_price: checkoutData.delivery_price || 0,
+
+        // Данные оплаты
+        payment_method: checkoutData.payment_method || 'cash',
+
+        // Комментарий
+        order_comments: checkoutData.order_comments || '',
+
+        // Статус
         status: 'new',
-        payment_method: 'cash',
         payment_status: 'unpaid',
-        delivery_type: 'pickup',
-        delivery_method: 'pickup',
-        delivery_price: deliveryPrice,
-        total_price: total_price,
+
+        // Итоговые суммы
+        total_price: checkoutData.total || totalAmount,
+        subtotal: checkoutData.subtotal || totalAmount,
+        discount: checkoutData.discount || 0,
+        delivery_cost: checkoutData.delivery_cost || 0,
+
         items: cart.items.map(item => ({
           product: item.product.id,
           meters: parseFloat(item.quantity) || 1,
           price_per_meter: parseFloat(item.price) || 0,
           total: parseFloat(item.quantity) * parseFloat(item.price)
         })),
+
         user: user.id
       };
 
@@ -601,28 +645,26 @@ module.exports = {
           data: orderData
         });
 
-        // console.log('✅ Заказ создан в базе с ID:', createdOrder.id, 'Номер:', createdOrder.order_number);
+        console.log('✅ Заказ создан в базе с ID:', createdOrder.id, 'Номер:', createdOrder.order_number);
 
-        // ПРОВЕРЯЕМ И ИСПРАВЛЯЕМ total_price если нужно
-        if (createdOrder.total_price === 0 || createdOrder.total_price !== total_price) {
-          console.log(`⚠️ total_price не совпадает: expected ${total_price}, got ${createdOrder.total_price}, исправляем...`);
+        // Проверяем total_price
+        const expectedTotal = checkoutData.total || totalAmount;
+        if (createdOrder.total_price === 0 || createdOrder.total_price !== expectedTotal) {
+          console.log(`⚠️ total_price не совпадает: expected ${expectedTotal}, got ${createdOrder.total_price}, исправляем...`);
 
           await strapi.entityService.update('api::order.order', createdOrder.id, {
             data: {
-              total_price: total_price
+              total_price: expectedTotal
             }
           });
 
-          // console.log('✅ total_price исправлен на', total_price);
-
-          // Обновляем объект createdOrder
-          createdOrder.total_price = total_price;
+          createdOrder.total_price = expectedTotal;
         }
 
       } catch (orderError) {
         console.error('❌ ОШИБКА создания заказа:', orderError.message);
 
-        // Если есть детали ошибки валидации, выведем их
+        // Если есть детали ошибки валидации
         if (orderError.details && orderError.details.errors) {
           console.error('🔍 Детали ошибок валидации:');
           orderError.details.errors.forEach((err, idx) => {
@@ -630,21 +672,19 @@ module.exports = {
           });
         }
 
-        // Создаем заказ с явным указанием total_price
+        // Создаем минимальный заказ
         try {
-          console.log('🔄 Пробуем создать заказ с явным total_price...');
-
           const fixedOrderData = {
-            customer_name: user.username,
-            customer_phone: user.phone || '+79990000000',
-            customer_email: user.email,
+            customer_name: checkoutData.customer_name || user.username,
+            customer_phone: checkoutData.customer_phone || user.phone || '+79990000000',
+            customer_email: checkoutData.customer_email || user.email,
             status: 'new',
-            payment_method: 'cash',
+            payment_method: checkoutData.payment_method || 'cash',
             payment_status: 'unpaid',
-            delivery_type: 'pickup',
-            delivery_method: 'pickup',
-            delivery_price: 0,
-            total_price: totalAmount,
+            delivery_type: checkoutData.delivery_type || 'pickup',
+            delivery_method: checkoutData.delivery_method || 'pickup',
+            delivery_price: checkoutData.delivery_price || 0,
+            total_price: checkoutData.total || totalAmount,
             items: [{
               product: cart.items[0]?.product?.id || 1,
               meters: 1,
@@ -658,7 +698,6 @@ module.exports = {
             data: fixedOrderData
           });
 
-          // console.log('✅ Заказ с total_price создан:', createdOrder.id);
         } catch (simpleError) {
           console.error('❌ Не удалось создать заказ:', simpleError.message);
 
@@ -666,9 +705,8 @@ module.exports = {
           createdOrder = {
             id: `TEMP-${Date.now()}`,
             order_number: `TEMP-ORDER-${Date.now()}`,
-            total_price: totalAmount
+            total_price: checkoutData.total || totalAmount
           };
-          // console.log('⚠️ Создан временный заказ:', createdOrder.order_number);
         }
       }
 
@@ -689,12 +727,23 @@ ${item.номер}. ${item.товар} (Арт: ${item.артикул})
 
 📊 ИТОГО:
 Количество товаров: ${totalQuantity} шт.
-Общая сумма: ${totalAmount} ₽
+Сумма товаров: ${checkoutData.subtotal || totalAmount} ₽
+${checkoutData.discount > 0 ? `Скидка: -${checkoutData.discount} ₽\n` : ''}${checkoutData.delivery_cost > 0 ? `Доставка: ${checkoutData.delivery_cost} ₽\n` : ''}
+Общая сумма: ${checkoutData.total || totalAmount} ₽
 
-👤 Информация о покупателе:
-Имя: ${orderData.customer_name}
-Email: ${user.email}
-Телефон: ${user.phone || 'не указан'}
+👤 ИНФОРМАЦИЯ О ЗАКАЗЧИКЕ:
+ФИО: ${orderData.customer_name}
+${orderData.customer_company ? `Компания: ${orderData.customer_company}\n` : ''}
+Email: ${orderData.customer_email}
+Телефон: ${orderData.customer_phone}
+
+📍 АДРЕС ДОСТАВКИ:
+${orderData.delivery_address}
+
+🚚 СПОСОБ ДОСТАВКИ: ${getDeliveryMethodName(orderData.delivery_method)}
+💳 СПОСОБ ОПЛАТЫ: ${getPaymentMethodName(orderData.payment_method)}
+
+${orderData.order_comments ? `💬 КОММЕНТАРИЙ К ЗАКАЗУ:\n${orderData.order_comments}\n` : ''}
 
 📅 Дата заказа: ${new Date().toLocaleString('ru-RU')}
 📦 Номер заказа: ${createdOrder.order_number}
@@ -718,9 +767,12 @@ Email: ${user.email}
         .order-details { width: 100%; border-collapse: collapse; margin: 20px 0; }
         .order-details th { background-color: #4CAF50; color: white; padding: 10px; text-align: left; }
         .order-details td { padding: 10px; border-bottom: 1px solid #ddd; }
-        .total { font-size: 18px; font-weight: bold; color: #4CAF50; margin-top: 20px; }
+        .total { font-size: 16px; font-weight: bold; color: #4CAF50; margin-top: 20px; }
+        .summary-item { margin: 5px 0; }
+        .customer-info { background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin-top: 20px; }
         .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #777; }
         .thank-you { background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin-top: 20px; font-size: 16px; }
+        .comment { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 4px solid #ffc107; }
     </style>
 </head>
 <body>
@@ -757,21 +809,40 @@ Email: ${user.email}
             </table>
 
             <div class="total">
-                <p>📊 ИТОГО:</p>
-                <p>Количество товаров: ${totalQuantity} шт.</p>
-                <p>Общая сумма: ${totalAmount} ₽</p>
+                <h3>📊 ИТОГО:</h3>
+                <div class="summary-item">Количество товаров: ${totalQuantity} шт.</div>
+                <div class="summary-item">Сумма товаров: ${checkoutData.subtotal || totalAmount} ₽</div>
+                ${checkoutData.discount > 0 ? `<div class="summary-item">Скидка: -${checkoutData.discount} ₽</div>` : ''}
+                ${checkoutData.delivery_cost > 0 ? `<div class="summary-item">Доставка: ${checkoutData.delivery_cost} ₽</div>` : ''}
+                <div class="summary-item" style="font-size: 18px; color: #d32f2f;">Общая сумма: ${checkoutData.total || totalAmount} ₽</div>
             </div>
 
-            <h2>👤 Информация о покупателе:</h2>
-            <p><strong>Имя:</strong> ${orderData.customer_name}</p>
-            <p><strong>Email:</strong> ${user.email}</p>
-            <p><strong>Телефон:</strong> ${user.phone || 'не указан'}</p>
-            <p><strong>Дата заказа:</strong> ${new Date().toLocaleString('ru-RU')}</p>
-            <p><strong>Номер заказа:</strong> ${createdOrder.order_number}</p>
+            <div class="customer-info">
+                <h2>👤 ИНФОРМАЦИЯ О ЗАКАЗЧИКЕ:</h2>
+                <p><strong>ФИО:</strong> ${orderData.customer_name}</p>
+                ${orderData.customer_company ? `<p><strong>Компания:</strong> ${orderData.customer_company}</p>` : ''}
+                <p><strong>Email:</strong> ${orderData.customer_email}</p>
+                <p><strong>Телефон:</strong> ${orderData.customer_phone}</p>
+                
+                <h3>📍 АДРЕС ДОСТАВКИ:</h3>
+                <p>${orderData.delivery_address || 'Не указан'}</p>
+                
+                <p><strong>🚚 Способ доставки:</strong> ${getDeliveryMethodName(orderData.delivery_method)}</p>
+                <p><strong>💳 Способ оплаты:</strong> ${getPaymentMethodName(orderData.payment_method)}</p>
+            </div>
+
+            ${orderData.order_comments ? `
+            <div class="comment">
+                <h3>💬 КОММЕНТАРИЙ К ЗАКАЗУ:</h3>
+                <p>${orderData.order_comments}</p>
+            </div>
+            ` : ''}
 
             <div class="thank-you">
                 <p><strong>📱 Спасибо за покупку!</strong></p>
                 <p>В ближайшее время с вами свяжутся для подтверждения заказа.</p>
+                <p><strong>Дата заказа:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+                <p><strong>Номер заказа:</strong> ${createdOrder.order_number}</p>
             </div>
             
             <div class="footer">
@@ -787,7 +858,7 @@ Email: ${user.email}
       const adminEmailContent = `
 🚨 НОВЫЙ ЗАКАЗ НА САЙТЕ CENTERTKANI.RU
 
-💼 Детали заказа:
+💼 ДЕТАЛИ ЗАКАЗА:
 
 ${itemsDetails.map(item => `
 ${item.номер}. ${item.товар} (Арт: ${item.артикул})
@@ -798,17 +869,37 @@ ${item.номер}. ${item.товар} (Арт: ${item.артикул})
 
 📊 ИТОГО:
 Количество товаров: ${totalQuantity} шт.
-Общая сумма: ${totalAmount} ₽
+Сумма товаров: ${checkoutData.subtotal || totalAmount} ₽
+${checkoutData.discount > 0 ? `Скидка: -${checkoutData.discount} ₽\n` : ''}${checkoutData.delivery_cost > 0 ? `Доставка: ${checkoutData.delivery_cost} ₽\n` : ''}
+Общая сумма: ${checkoutData.total || totalAmount} ₽
 
-👤 Информация о покупателе:
-Имя: ${orderData.customer_name}
-Email: ${user.email}
-Телефон: ${user.phone || 'не указан'}
-ID пользователя: ${user.id}
+👤 ИНФОРМАЦИЯ О ЗАКАЗЧИКЕ:
+ФИО: ${orderData.customer_name}
+${orderData.customer_company ? `Компания: ${orderData.customer_company}\n` : ''}
+Имя: ${orderData.customer_firstName}
+Фамилия: ${orderData.customer_lastName}
+${orderData.customer_middleName ? `Отчество: ${orderData.customer_middleName}\n` : ''}
+Email: ${orderData.customer_email}
+Телефон: ${orderData.customer_phone}
+
+📍 АДРЕС ДОСТАВКИ:
+Город: ${orderData.customer_city || 'не указан'}
+Регион: ${orderData.customer_region || 'не указан'}
+Адрес: ${orderData.customer_address || 'не указан'}
+Индекс: ${orderData.customer_postcode || 'не указан'}
+Полный адрес: ${orderData.delivery_address}
+
+🚚 СПОСОБ ДОСТАВКИ: ${getDeliveryMethodName(orderData.delivery_method)}
+💳 СПОСОБ ОПЛАТЫ: ${getPaymentMethodName(orderData.payment_method)}
+
+${orderData.order_comments ? `💬 КОММЕНТАРИЙ К ЗАКАЗУ:\n${orderData.order_comments}\n` : ''}
 
 📅 Дата заказа: ${new Date().toLocaleString('ru-RU')}
 🔗 Номер заказа: ${createdOrder.order_number}
 🔗 ID заказа: ${createdOrder.id}
+👤 ID пользователя: ${user.id}
+
+💰 ИТОГОВАЯ СУММА: ${checkoutData.total || totalAmount} ₽
     `;
 
       // HTML версия для администратора
@@ -825,9 +916,13 @@ ID пользователя: ${user.id}
         .order-details { width: 100%; border-collapse: collapse; margin: 20px 0; }
         .order-details th { background-color: #f44336; color: white; padding: 10px; text-align: left; }
         .order-details td { padding: 10px; border-bottom: 1px solid #ddd; }
-        .total { font-size: 18px; font-weight: bold; color: #f44336; margin-top: 20px; }
+        .total { font-size: 16px; font-weight: bold; color: #f44336; margin-top: 20px; }
+        .summary-item { margin: 5px 0; }
         .customer-info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .address-info { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin-top: 10px; }
         .urgent { color: #f44336; font-weight: bold; }
+        .comment { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 4px solid #ffc107; }
+        .meta-info { background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin-top: 15px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -866,21 +961,50 @@ ID пользователя: ${user.id}
             </table>
 
             <div class="total">
-                <p>📊 ИТОГО:</p>
-                <p>Количество товаров: ${totalQuantity} шт.</p>
-                <p>Общая сумма: ${totalAmount} ₽</p>
+                <h3>📊 ИТОГО:</h3>
+                <div class="summary-item">Количество товаров: ${totalQuantity} шт.</div>
+                <div class="summary-item">Сумма товаров: ${checkoutData.subtotal || totalAmount} ₽</div>
+                ${checkoutData.discount > 0 ? `<div class="summary-item">Скидка: -${checkoutData.discount} ₽</div>` : ''}
+                ${checkoutData.delivery_cost > 0 ? `<div class="summary-item">Доставка: ${checkoutData.delivery_cost} ₽</div>` : ''}
+                <div class="summary-item" style="font-size: 18px; color: #d32f2f;">Общая сумма: ${checkoutData.total || totalAmount} ₽</div>
             </div>
 
             <div class="customer-info">
-                <h2>👤 Информация о покупателе:</h2>
-                <p><strong>Имя:</strong> ${orderData.customer_name}</p>
-                <p><strong>Email:</strong> ${user.email}</p>
-                <p><strong>Телефон:</strong> ${user.phone || 'не указан'}</p>
-                <p><strong>ID пользователя:</strong> ${user.id}</p>
-                <p><strong>Дата заказа:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+                <h2>👤 ИНФОРМАЦИЯ О ЗАКАЗЧИКЕ:</h2>
+                <p><strong>ФИО:</strong> ${orderData.customer_name}</p>
+                <p><strong>Имя:</strong> ${orderData.customer_firstName}</p>
+                <p><strong>Фамилия:</strong> ${orderData.customer_lastName}</p>
+                ${orderData.customer_middleName ? `<p><strong>Отчество:</strong> ${orderData.customer_middleName}</p>` : ''}
+                ${orderData.customer_company ? `<p><strong>Компания:</strong> ${orderData.customer_company}</p>` : ''}
+                <p><strong>Email:</strong> ${orderData.customer_email}</p>
+                <p><strong>Телефон:</strong> ${orderData.customer_phone}</p>
+            </div>
+
+            <div class="address-info">
+                <h3>📍 АДРЕС ДОСТАВКИ:</h3>
+                <p><strong>Город:</strong> ${orderData.customer_city || 'не указан'}</p>
+                <p><strong>Регион:</strong> ${orderData.customer_region || 'не указан'}</p>
+                <p><strong>Адрес:</strong> ${orderData.customer_address || 'не указан'}</p>
+                <p><strong>Индекс:</strong> ${orderData.customer_postcode || 'не указан'}</p>
+                <p><strong>Полный адрес:</strong> ${orderData.delivery_address || 'не указан'}</p>
+                
+                <p><strong>🚚 Способ доставки:</strong> ${getDeliveryMethodName(orderData.delivery_method)}</p>
+                <p><strong>💳 Способ оплаты:</strong> ${getPaymentMethodName(orderData.payment_method)}</p>
+            </div>
+
+            ${orderData.order_comments ? `
+            <div class="comment">
+                <h3>💬 КОММЕНТАРИЙ К ЗАКАЗУ:</h3>
+                <p>${orderData.order_comments}</p>
+            </div>
+            ` : ''}
+
+            <div class="meta-info">
+                <p><strong>📅 Дата заказа:</strong> ${new Date().toLocaleString('ru-RU')}</p>
                 <p><strong>🔗 Номер заказа:</strong> ${createdOrder.order_number}</p>
                 <p><strong>🔗 ID заказа:</strong> ${createdOrder.id}</p>
-                <p><strong>💰 Итоговая сумма:</strong> ${totalAmount} ₽</p>
+                <p><strong>👤 ID пользователя:</strong> ${user.id}</p>
+                <p style="font-size: 16px; font-weight: bold; color: #f44336;">💰 ИТОГОВАЯ СУММА: ${checkoutData.total || totalAmount} ₽</p>
             </div>
         </div>
     </div>
@@ -890,31 +1014,27 @@ ID пользователя: ${user.id}
 
       // Отправляем письма
       try {
-        // 1. Отправляем письмо покупателю
-        // console.log('📧 Отправляем письмо покупателю:', user.email);
         await strapi.plugins['email'].services.email.send({
-          to: user.email,
+          to: orderData.customer_email,
           from: 'centertkani-shop@yandex.com',
           subject: `🎉 Ваш заказ на centertkani.ru (№${createdOrder.order_number})`,
           text: emailContent,
           html: htmlEmailContent,
         });
-        // console.log('✅ Письмо покупателю отправлено');
+        console.log('✅ Письмо покупателю отправлено');
       } catch (emailError) {
         console.error('🔴 Ошибка отправки письма покупателю:', emailError);
       }
 
       try {
-        // 2. Отправляем письмо администратору
-        console.log('📧 Отправляем письмо администратору: centertkani-shop@yandex.com');
         await strapi.plugins['email'].services.email.send({
           to: 'centertkani-shop@yandex.com',
           from: 'centertkani-shop@yandex.com',
-          subject: `🚨 Новый заказ! ${createdOrder.order_number} на сумму ${totalAmount} ₽`,
+          subject: `🚨 Новый заказ! ${createdOrder.order_number} на сумму ${checkoutData.total || totalAmount} ₽`,
           text: adminEmailContent,
           html: adminHtmlEmailContent,
         });
-        // console.log('✅ Письмо администратору отправлено');
+        console.log('✅ Письмо администратору отправлено');
       } catch (adminEmailError) {
         console.error('🔴 Ошибка отправки письма администратору:', adminEmailError);
       }
@@ -926,25 +1046,23 @@ ID пользователя: ${user.id}
         }
       });
 
-      // console.log('✅ Корзина очищена после оформления заказа');
+      console.log('✅ Корзина очищена после оформления заказа');
 
       // ========== СОЗДАНИЕ УВЕДОМЛЕНИЯ ==========
 
       let notificationCreated = false;
       try {
-        // console.log('🔔 Создаем уведомление для пользователя о новом заказе');
-
         const notification = await strapi.entityService.create('api::notification.notification', {
           data: {
             title: `🎉 Ваш заказ №${createdOrder.order_number} принят!`,
-            message: `Ваш заказ на сумму ${totalAmount} ₽ успешно оформлен. 
+            message: `Ваш заказ на сумму ${checkoutData.total || totalAmount} ₽ успешно оформлен. 
 Статус заказа: "Новый".
 Мы свяжемся с вами для подтверждения заказа в ближайшее время.
-          
+
 Детали заказа:
 ${itemsDetails.map(item => `• ${item.товар} - ${item.количество} шт. = ${item.сумма}`).join('\n')}
-          
-Итоговая сумма: ${totalAmount} ₽`,
+
+Итоговая сумма: ${checkoutData.total || totalAmount} ₽`,
             type: 'order_created',
             is_read: false,
             order_id: createdOrder.id,
@@ -952,7 +1070,6 @@ ${itemsDetails.map(item => `• ${item.товар} - ${item.количество
           }
         });
 
-        // console.log('✅ Уведомление создано:', notification.id);
         notificationCreated = true;
       } catch (notificationError) {
         console.error('🔴 Ошибка создания уведомления:', notificationError.message);
@@ -970,15 +1087,18 @@ ${itemsDetails.map(item => `• ${item.товар} - ${item.количество
             email: user.email,
             phone: user.phone
           },
+          order_data: orderData,
           items: itemsDetails,
           summary: {
             total_quantity: totalQuantity,
-            total_amount: totalAmount,
+            subtotal: checkoutData.subtotal || totalAmount,
+            discount: checkoutData.discount || 0,
+            delivery_cost: checkoutData.delivery_cost || 0,
+            total_amount: checkoutData.total || totalAmount,
             currency: '₽'
           },
           email_sent: true,
-          notification_created: notificationCreated,
-          formatted_email: `Вы заказали на сайте centertkani.ru на сумму ${totalAmount} ₽. В ближайшее время с вами свяжутся для подтверждения заказа.`
+          notification_created: notificationCreated
         }
       };
 
