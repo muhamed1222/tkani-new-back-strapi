@@ -1,0 +1,137 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Заказы",
+    "description": "Заказы интернет-магазина Центр Ткани"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "order_number": {
+      "type": "string",
+      "unique": true
+    },
+    "order_status": {
+      "type": "enumeration",
+      "enum": [
+        "new",
+        "pending_payment",
+        "paid",
+        "processing",
+        "shipped",
+        "completed",
+        "canceled"
+      ],
+      "default": "new",
+      "required": false
+    },
+    "customer_name": {
+      "type": "string",
+      "required": true
+    },
+    "customer_firstName": {
+      "type": "string"
+    },
+    "customer_lastName": {
+      "type": "string"
+    },
+    "customer_middleName": {
+      "type": "string"
+    },
+    "customer_company": {
+      "type": "string"
+    },
+    "customer_phone": {
+      "type": "string",
+      "required": true
+    },
+    "customer_email": {
+      "type": "email",
+      "required": true
+    },
+    "customer_comment": {
+      "type": "text"
+    },
+    "order_comments": {
+      "type": "text"
+    },
+    "payment_method": {
+      "type": "enumeration",
+      "enum": [
+        "card",
+        "cash",
+        "invoice",
+        "yookassa",
+        "cloudpayments"
+      ],
+      "required": true
+    },
+    "payment_status": {
+      "type": "enumeration",
+      "enum": [
+        "unpaid",
+        "pending",
+        "paid",
+        "failed"
+      ],
+      "default": "unpaid",
+      "required": true
+    },
+    "delivery_type": {
+      "type": "enumeration",
+      "enum": [
+        "pickup",
+        "delivery"
+      ],
+      "required": true
+    },
+    "delivery_method": {
+      "type": "enumeration",
+      "enum": [
+        "pickup",
+        "russian_post",
+        "cdek",
+        "ozon"
+      ]
+    },
+    "delivery_address": {
+      "type": "text"
+    },
+    "delivery_city": {
+      "type": "string"
+    },
+    "delivery_postcode": {
+      "type": "string"
+    },
+    "delivery_region": {
+      "type": "string"
+    },
+    "delivery_price": {
+      "type": "decimal",
+      "default": 0,
+      "min": 0
+    },
+    "items": {
+      "type": "component",
+      "repeatable": true,
+      "component": "order.order-item",
+      "required": true,
+      "min": 1
+    },
+    "total_price": {
+      "type": "decimal",
+      "required": true,
+      "private": true
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

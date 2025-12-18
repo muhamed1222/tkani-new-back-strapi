@@ -1,0 +1,148 @@
+{
+  "layouts": {
+    "list": ["id", "title", "updatedAt"],
+    "edit": [
+      [
+        {
+          "name": "title",
+          "size": 6
+        },
+        {
+          "name": "link",
+          "size": 6
+        }
+      ],
+      [
+        {
+          "name": "description",
+          "size": 12
+        }
+      ],
+      [
+        {
+          "name": "fabrics",
+          "size": 12
+        }
+      ],
+      [
+        {
+          "name": "images",
+          "size": 12
+        }
+      ]
+    ]
+  },
+  "metadatas": {
+    "id": {
+      "edit": {},
+      "list": {
+        "label": "Id",
+        "searchable": true,
+        "sortable": true
+      }
+    },
+    "title": {
+      "edit": {
+        "label": "Заголовок",
+        "description": "Название работы",
+        "placeholder": "Введите заголовок работы",
+        "visible": true,
+        "editable": true
+      },
+      "list": {
+        "label": "Заголовок",
+        "searchable": true,
+        "sortable": true
+      }
+    },
+    "description": {
+      "edit": {
+        "label": "Описание",
+        "description": "Подробное описание работы",
+        "placeholder": "Введите описание работы",
+        "visible": true,
+        "editable": true
+      },
+      "list": {
+        "label": "Описание",
+        "searchable": true,
+        "sortable": false
+      }
+    },
+    "images": {
+      "edit": {
+        "label": "Фотографии",
+        "description": "Фотографии работы. Можно загрузить несколько изображений. Первое изображение будет использоваться для карточки в списке работ.",
+        "visible": true,
+        "editable": true
+      },
+      "list": {
+        "label": "Фотографии",
+        "searchable": false,
+        "sortable": false
+      }
+    },
+    "link": {
+      "edit": {
+        "label": "Ссылка",
+        "description": "Ссылка на работу (если есть)",
+        "placeholder": "#",
+        "visible": true,
+        "editable": true
+      },
+      "list": {
+        "label": "Ссылка",
+        "searchable": true,
+        "sortable": false
+      }
+    },
+    "fabrics": {
+      "edit": {
+        "label": "Ткани",
+        "description": "Выберите ткани, использованные в работе. Можно выбрать несколько тканей. Используйте поиск для быстрого нахождения нужной ткани.",
+        "placeholder": "Начните вводить название ткани для поиска",
+        "visible": true,
+        "editable": true
+      },
+      "list": {
+        "label": "Ткани",
+        "searchable": false,
+        "sortable": false
+      }
+    },
+    "createdAt": {
+      "edit": {
+        "label": "Создано",
+        "description": "",
+        "placeholder": "",
+        "visible": false,
+        "editable": true
+      },
+      "list": {
+        "label": "Создано",
+        "searchable": true,
+        "sortable": true
+      }
+    },
+    "updatedAt": {
+      "edit": {
+        "label": "Обновлено",
+        "description": "",
+        "placeholder": "",
+        "visible": false,
+        "editable": true
+      },
+      "list": {
+        "label": "Обновлено",
+        "searchable": true,
+        "sortable": true
+      }
+    }
+  },
+  "settings": {
+    "mainField": "title",
+    "defaultSortBy": "title",
+    "defaultSortOrder": "ASC"
+  }
+}
+

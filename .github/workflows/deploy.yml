@@ -1,0 +1,53 @@
+name: Deploy to Hosting (REG.RU)
+
+on:
+  push:
+    branches:
+      - main   # деплой при пуше в main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install Strapi dependencies
+      working-directory: ./strapi
+      run: npm install
+
+    - name: Build Strapi
+      working-directory: ./strapi
+      run: npm run build
+
+    - name: Upload project via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+      with:
+        server: ${{ secrets.FTP_HOST }}
+        username: ${{ secrets.FTP_USER }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        protocol: ftp
+        port: 21
+        local-dir: ./
+        server-dir: ${{ secrets.FTP_PATH }}
+        exclude: |
+          **/.git*
+          **/.github*
+          **/node_modules**
+          **/__pycache__**
+          **/*.pyc
+          **/.env*
+          **/backups/**
+          **/migrations/**
+          **/tests/**
+          **/static/avatars/**
+          **/static/products/**
+          strapi/node_modules/**
+          strapi/.cache/**
+

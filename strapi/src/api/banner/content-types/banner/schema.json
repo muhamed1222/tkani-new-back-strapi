@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "banners",
+  "info": {
+    "singularName": "banner",
+    "pluralName": "banners",
+    "displayName": "Баннеры",
+    "description": "Баннеры для слайдеров на главной странице"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "textPosition": {
+      "type": "enumeration",
+      "enum": [
+        "left",
+        "right"
+      ],
+      "required": true,
+      "default": "left"
+    },
+    "section": {
+      "type": "enumeration",
+      "enum": [
+        "clothing",
+        "home"
+      ],
+      "required": true,
+      "default": "clothing"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    }
+  }
+}

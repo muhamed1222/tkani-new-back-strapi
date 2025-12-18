@@ -1,0 +1,33 @@
+{
+  "collectionName": "components_seo_seo_fields",
+  "info": {
+    "displayName": "SEO Fields",
+    "description": "SEO поля для мета-тегов и Open Graph"
+  },
+  "options": {},
+  "attributes": {
+    "metaTitle": {
+      "type": "string",
+      "maxLength": 60
+    },
+    "metaDescription": {
+      "type": "text",
+      "maxLength": 160
+    },
+    "ogTitle": {
+      "type": "string"
+    },
+    "ogDescription": {
+      "type": "text"
+    },
+    "ogImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "canonicalUrl": {
+      "type": "string"
+    }
+  }
+}

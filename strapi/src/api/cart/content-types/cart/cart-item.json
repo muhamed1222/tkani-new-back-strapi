@@ -1,0 +1,24 @@
+{
+  "collectionName": "components_cart_cart_items",
+  "info": {
+    "displayName": "Элемент корзины",
+    "description": "Элемент корзины"
+  },
+  "attributes": {
+    "product": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::product.product"
+    },
+    "quantity": {
+      "type": "decimal",
+      "required": true,
+      "default": 1,
+      "min": 0.5
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    }
+  }
+}

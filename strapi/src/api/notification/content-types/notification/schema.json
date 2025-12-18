@@ -1,0 +1,47 @@
+{
+  "kind": "collectionType",
+  "collectionName": "notifications",
+  "info": {
+    "singularName": "notification",
+    "pluralName": "notifications",
+    "displayName": "Уведомления",
+    "description": "Уведомления пользователей"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "message": {
+      "type": "text",
+      "required": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "order_created",
+        "order_status_changed",
+        "order_completed",
+        "system",
+        "promotion"
+      ],
+      "default": "system"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false
+    },
+    "order_id": {
+      "type": "integer"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

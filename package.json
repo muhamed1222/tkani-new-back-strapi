@@ -1,0 +1,18 @@
+{
+  "name": "tkani-new-back-strapi",
+  "version": "1.0.0",
+  "description": "Backend Strapi CMS для магазина тканей",
+  "private": true,
+  "scripts": {
+    "dev": "cd strapi && npm run develop",
+    "build": "cd strapi && npm run build",
+    "start": "cd strapi && npm run start",
+    "install:all": "cd strapi && npm install"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=6.0.0"
+  },
+  "license": "MIT"
+}
+
